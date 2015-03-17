@@ -22,8 +22,9 @@ func TestCapacityCPU(t *testing.T) {
 	}
 
 	dspace := NewDeploymentSpace(&vms, 7.0, 4)
-	dspace.CapacityBy("cpu")
-	t.Logf("configs by cpu", dspace)
+	dspace.CapacityBy("CPU")
+	//t.Logf("configs by cpu", dspace)
+	//t.Logf("mapa by cpu", mapa)
 }
 
 func TestCapacityMem(t *testing.T) {
@@ -33,17 +34,18 @@ func TestCapacityMem(t *testing.T) {
 	}
 
 	dspace := NewDeploymentSpace(&vms, 7.0, 4)
-	dspace.CapacityBy("mem")
-	t.Logf("configs by mem", dspace)
+	mapa := dspace.CapacityBy("Mem")
+	t.Logf("mapa by mem :%v", printTree(mapa))
 }
 
-func TestCapacityPrice(t *testing.T) {
+/*func TestCapacityPrice(t *testing.T) {
 	vms, err := LoadTypes("/home/vagrant/go/src/github.com/mathcunha/CloudCapacitor/config/dspace.yml")
 	if err != nil {
 		t.Errorf("config error")
 	}
 
 	dspace := NewDeploymentSpace(&vms, 7.0, 4)
-	dspace.CapacityBy("price")
+	mapa := dspace.CapacityBy("Price")
 	t.Logf("configs by price", dspace)
-}
+	t.Logf("mapa by price", printTree(mapa))
+}*/
