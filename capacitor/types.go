@@ -24,12 +24,20 @@ func (c *Configuration) Price() float32 {
 	return float32(c.Size) * c.VM.Price
 }
 
+func (c *Configuration) Mem() float32 {
+	return float32(c.Size) * c.VM.Mem
+}
+
+func (c *Configuration) CPU() float32 {
+	return float32(c.Size) * c.VM.CPU
+}
+
 func (vm VM) String() string {
 	return fmt.Sprintf("{category:%v, cpu:%v , mem:%v, price:%v}", vm.Category, vm.CPU, vm.Mem, vm.Price)
 }
 
 func (c Configuration) String() string {
-	return fmt.Sprintf("{vm:%v, size:%v}", c.VM, c.Size)
+	return fmt.Sprintf("{vm:%v, size:%v, cpu:%v, mem:%v, price:%v}", c.VM.Name, c.Size, c.CPU(), c.Mem(), c.Price())
 }
 
 func LoadTypes(path string) (vms []VM, err error) {
