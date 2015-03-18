@@ -2,7 +2,6 @@ package capacitor
 
 import (
 	"fmt"
-	"log"
 	"reflect"
 	"sort"
 	"strconv"
@@ -19,7 +18,7 @@ type Node struct {
 type Nodes []*Node
 
 type DeploymentSpace struct {
-	configs Configs
+	configs *map[string]Configs
 }
 
 type Configs []*Configuration
@@ -35,7 +34,7 @@ func (s byCPU) Less(i, j int) bool   { return s.Configs[i].CPU() < s.Configs[j].
 func (s byPrice) Less(i, j int) bool { return s.Configs[i].Price() < s.Configs[j].Price() }
 
 func NewDeploymentSpace(vms *[]VM, price float32, size int) (dspace DeploymentSpace) {
-	conf := Configs{}
+	mapa := make(map[string]Configs)
 	atLeatOne := true
 	for i := 1; i <= size && atLeatOne; i++ {
 		atLeatOne = false
@@ -43,72 +42,67 @@ func NewDeploymentSpace(vms *[]VM, price float32, size int) (dspace DeploymentSp
 			c := Configuration{i, v}
 			if c.Price() <= price {
 				atLeatOne = true
+				conf := mapa[c.Category]
 				conf = append(conf, &c)
+				mapa[c.Category] = conf
 			}
 		}
 	}
-	return DeploymentSpace{conf}
+	return DeploymentSpace{&mapa}
 }
 
-func (dspace *DeploymentSpace) CapacityBy(prop string) *map[string]Nodes {
-	switch prop {
+func (dspace *DeploymentSpace) CapacityBy(prop string) (list *map[string]Nodes) {
+	for _, v := range *dspace.configs {
+		switch prop {
 
-	case "Mem":
-		sort.Sort(byMem{dspace.configs})
-	case "CPU":
-		sort.Sort(byCPU{dspace.configs})
-	case "Price":
-		sort.Sort(byPrice{dspace.configs})
+		case "Mem":
+			sort.Sort(byMem{v})
+		case "CPU":
+			sort.Sort(byCPU{v})
+		case "Price":
+			sort.Sort(byPrice{v})
+		}
+
 	}
 
-	//not empty configs
-	if len(dspace.configs) > 0 {
-		return dspace.buildNodes(prop)
-	}
-
-	return nil
+	return dspace.buildNodes(prop)
 }
 
 func (dspace *DeploymentSpace) buildNodes(prop string) *map[string]Nodes {
 	mapa := make(map[string]Nodes)
-	v := reflect.ValueOf(dspace.configs[0]).MethodByName(prop).Call(nil)
-	cat := dspace.configs[0].Category
-	node := new(Node)
-	equal, ID := equalID(v[0], v[0])
-	node.ID = ID
-	node.Height = 0
-
-	for _, c := range dspace.configs {
-		equal, ID = equalID(v[0], reflect.ValueOf(c).MethodByName(prop).Call(nil)[0])
-		if cat == c.Category && equal {
-			node.Configs = append(node.Configs, c)
-		} else {
-			updateMap(&mapa, node, cat)
-			node = new(Node)
-			node.ID = ID
-			node.Configs = append(node.Configs, c)
-			cat = c.Category
-			v = reflect.ValueOf(c).MethodByName(prop).Call(nil)
+	for cat, configs := range *dspace.configs {
+		v := reflect.ValueOf(configs[0]).MethodByName(prop).Call(nil)
+		node := new(Node)
+		equal, ID := equalID(v[0], v[0])
+		node.ID = ID
+		node.Height = 0
+		for _, c := range configs {
+			equal, ID = equalID(v[0], reflect.ValueOf(c).MethodByName(prop).Call(nil)[0])
+			if equal {
+				node.Configs = append(node.Configs, c)
+			} else {
+				updateMap(&mapa, node, cat)
+				node = new(Node)
+				node.ID = ID
+				node.Configs = append(node.Configs, c)
+				v = reflect.ValueOf(c).MethodByName(prop).Call(nil)
+			}
 		}
 	}
 
-	if node != nil {
-		updateMap(&mapa, node, cat)
-	}
 	return &mapa
 }
 
 func updateMap(mapa *map[string]Nodes, node *Node, cat string) {
 	m := *mapa
 	n, has := m[cat]
-	log.Println(cat)
 	if has {
 		max := len(n)
 		nodes := append(n, node)
 
 		nodes[max].Higher = nodes[max-1]
 		nodes[max-1].Lower = nodes[max]
-		nodes[max].Height = max
+		nodes[max].Height = max + 1
 
 		m[cat] = nodes
 	} else {
@@ -131,8 +125,10 @@ func equalID(x reflect.Value, y reflect.Value) (equal bool, id string) {
 
 func (dspace DeploymentSpace) String() string {
 	str := ""
-	for _, v := range dspace.configs {
-		str = fmt.Sprintf("%v%v\n", str, *v)
+	for _, confs := range *dspace.configs {
+		for _, v := range confs {
+			str = fmt.Sprintf("%v%v\n", str, *v)
+		}
 	}
 	return str
 }
