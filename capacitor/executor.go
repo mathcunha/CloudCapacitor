@@ -20,16 +20,16 @@ type Performance struct {
 	SLO float32
 }
 
-type Executer interface {
+type Executor interface {
 	Execute(config Configuration, wkl string) (r Result)
 }
 
-type MockExecuter struct {
+type MockExecutor struct {
 	FilePath string
 	records  map[string][]string
 }
 
-func (e *MockExecuter) Load() error {
+func (e *MockExecutor) Load() error {
 	file, err := os.Open(e.FilePath)
 	if err != nil {
 		log.Printf("error opening file %v:%v", e.FilePath, err)
@@ -50,7 +50,7 @@ func (e *MockExecuter) Load() error {
 	return err
 }
 
-func (e *MockExecuter) Execute(config Configuration, wkl string) (result Result) {
+func (e MockExecutor) Execute(config Configuration, wkl string) (result Result) {
 	r := new(Result)
 
 	r.Config = config
@@ -69,8 +69,10 @@ func (e *MockExecuter) Execute(config Configuration, wkl string) (result Result)
 
 		f32, _ = strconv.ParseFloat(perf[0], 32)
 		p.SLO = float32(f32)
+
+		r.Performance = p
 	} else {
-		log.Printf("MockExecuter.Execute, key(%v) not found", key)
+		log.Printf("MockExecutor.Execute, key(%v) not found", key)
 	}
 
 	return *r
