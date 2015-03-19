@@ -88,6 +88,10 @@ func (dspace *DeploymentSpace) buildNodes(prop string) *map[string]Nodes {
 				v = reflect.ValueOf(c).MethodByName(prop).Call(nil)
 			}
 		}
+
+		if node != nil {
+			updateMap(&mapa, node, cat)
+		}
 	}
 
 	return &mapa
