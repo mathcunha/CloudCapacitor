@@ -12,7 +12,7 @@ type Capacitor struct {
 }
 
 type NodesInfo struct {
-	matrix   map[string]NodeInfo
+	matrix   map[string]*NodeInfo
 	lenWKL   int
 	lenNodes int
 }
@@ -43,17 +43,33 @@ func (c *Capacitor) BF(mode string, slo float32, wkls []string) {
 
 func (c *Capacitor) MinExec(mode string, slo float32, wkls []string) {
 	mapa := c.dspace.CapacityBy(mode)
+	//fmt.Println(mapa)
 	for _, nodes := range *mapa {
-		c.Exec(buildMatrix(wkls, nodes), slo, 0, "")
+		c.ExecCategory(wkls, nodes, slo)
 	}
 }
 
+func (c *Capacitor) ExecCategory(wkls []string, nodes Nodes, slo float32) {
+	matrix := buildMatrix(wkls, nodes)
+	//fmt.Println(matrix)
+	c.Exec(matrix, slo, 0, "")
+	//fmt.Printf("%v - %v\n", exec, path)
+
+}
+
 func buildMatrix(wkls []string, nodes Nodes) (matrix NodesInfo) {
-	iNodes := NodesInfo{make(map[string]NodeInfo), -1, -1}
+	iNodes := NodesInfo{make(map[string]*NodeInfo), -1, -1}
 	max := -1
 	for _, node := range nodes {
 		for i, wkl := range wkls {
-			iNodes.matrix[fmt.Sprintf("%v_%v", node.Height, i)] = NodeInfo{*node, wkl, false, false, false, -1}
+			n := new(NodeInfo)
+			n.Node = *node
+			n.WKL = wkl
+			n.Exec = false
+			n.Reject = false
+			n.Candidate = false
+			n.When = -1
+			iNodes.matrix[fmt.Sprintf("%v_%v", node.Height, i)] = n
 		}
 		max = node.Height
 	}
@@ -67,62 +83,67 @@ func (c *Capacitor) Exec(iNodes NodesInfo, slo float32, execs int, path string) 
 		noneAvailable := true
 		if !(node.When != -1) {
 			noneAvailable = false
+			cNodes := iNodes.Clone()
 			for _, conf := range node.Configs {
 				execs = execs + 1
-				node.When = execs
 
 				result := c.exec.Execute(*conf, node.WKL)
-				clone := iNodes.Clone()
-				pClone := &clone
-				pINode := &iNodes
 
-				pINode.Mark(key, result.SLO <= slo, execs)
-				fmt.Printf("%v %v\n", key, pClone.Equal(pINode))
+				cNodes.Mark(key, result.SLO <= slo, execs)
 
-				//fmt.Printf("%v x %v ? %v \n", *conf, node.WKL, result.SLO <= slo)
-				//Faço as marcações
-				//Verifica se tem mais node para chamar
-				//Exec(slo, wkls, nodes, execs, path)
 			}
+
+			c.Exec(*cNodes, slo, execs, fmt.Sprintf("%v%v,", path, key))
 		}
 		if noneAvailable {
 			//All executions!
-			fmt.Printf("%v, %v", execs, path)
+			fmt.Printf("#execs:%v, path:%v \n", execs, path)
 			return execs, path
 		}
 	}
-	return -1, ""
+	return -1, "WARNING - NO NODE"
 }
 
 func (pNodes *NodesInfo) Mark(key string, metslo bool, exec int) {
 	s := strings.Split(key, "_")
 	cHeight, _ := strconv.ParseInt(s[0], 0, 64)
 	cWKL, _ := strconv.ParseInt(s[1], 0, 64)
-	//fmt.Printf("%v_%v \n", cHeight, cWKL)
+	//fmt.Printf("INI MARK\n")
+	//fmt.Printf("%v ? %v\n", key, metslo)
 	iNodes := *pNodes
 	matrix := iNodes.matrix
 
+	matrix[key].When = exec
+	matrix[key].Exec = true
+
 	if metslo {
-		for height := int64(1); height < cHeight; height++ {
+		matrix[key].Candidate = true
+		for height := cHeight; height <= int64(pNodes.lenNodes); height++ {
 			for i := cWKL; i >= 0; i-- {
-				nodeInfo := matrix[fmt.Sprintf("%v_%v", height, i)]
-				if nodeInfo.When != -1 {
+				key := fmt.Sprintf("%v_%v", height, i)
+				nodeInfo := matrix[key]
+				if nodeInfo.When == -1 {
 					nodeInfo.Candidate = true
 					nodeInfo.When = exec
+					//fmt.Println("\tmarcando ", key, " candidato ")
 				}
 			}
 		}
 	} else {
-		for height := cHeight - 1; height >= 1; height-- {
-			for i := int64(0); i <= cWKL; i++ {
-				nodeInfo := matrix[fmt.Sprintf("%v_%v", height, i)]
-				if nodeInfo.When != -1 {
+		matrix[key].Candidate = false
+		for height := cHeight; height >= 1; height-- {
+			for i := cWKL; i < int64(pNodes.lenWKL); i++ {
+				key := fmt.Sprintf("%v_%v", height, i)
+				nodeInfo := matrix[key]
+				if nodeInfo.When == -1 {
 					nodeInfo.Reject = true
 					nodeInfo.When = exec
+					//fmt.Println("\tmarcando ", key, " rejeitado ")
 				}
 			}
 		}
 	}
+	//fmt.Printf("FIM MARK\n")
 }
 func (node *NodeInfo) Equal(other *NodeInfo) bool {
 	return node.Height == other.Height && node.ID == other.ID && node.Exec == other.Exec && node.Reject == other.Reject && node.Candidate == other.Candidate && node.When == other.When
@@ -132,16 +153,29 @@ func (iNode *NodesInfo) Equal(other *NodesInfo) bool {
 	clone := *other
 	matrix := *iNode
 	for key, n := range matrix.matrix {
-		oNode := clone.matrix[key]
-		node := &n
-		if !node.Equal(&oNode) {
+		if !n.Equal(clone.matrix[key]) {
 			return false
 		}
 	}
 	return true
 }
 
-func (matrix NodesInfo) Clone() (clone NodesInfo) {
-	clone = matrix
-	return clone
+func (matrix NodesInfo) Clone() (clone *NodesInfo) {
+	mapa := make(map[string]*NodeInfo)
+	for key, node := range matrix.matrix {
+		n := new(NodeInfo)
+		n.Node = node.Node
+		n.WKL = node.WKL
+		n.Exec = node.Exec
+		n.Reject = node.Reject
+		n.Candidate = node.Candidate
+		n.When = node.When
+
+		mapa[key] = n
+	}
+	pClone := new(NodesInfo)
+	pClone.matrix = mapa
+	pClone.lenWKL = matrix.lenWKL
+	pClone.lenNodes = matrix.lenNodes
+	return pClone
 }
