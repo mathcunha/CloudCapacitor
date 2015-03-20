@@ -2,13 +2,15 @@ package capacitor
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 type Capacitor struct {
-	dspace DeploymentSpace
-	exec   Executor
+	Dspace DeploymentSpace
+	Executor
 }
 
 type NodesInfo struct {
@@ -26,15 +28,20 @@ type NodeInfo struct {
 	When      int
 }
 
+type ExecInfo struct {
+	Execs int
+	Path  string
+}
+
 //Brutal force heuristic
 func (c *Capacitor) BF(mode string, slo float32, wkls []string) {
-	mapa := c.dspace.CapacityBy(mode)
+	mapa := c.Dspace.CapacityBy(mode)
 	for _, nodes := range *mapa {
 		for _, node := range nodes {
 			for _, conf := range node.Configs {
 				for _, wkl := range wkls {
-					result := c.exec.Execute(*conf, wkl)
-					fmt.Printf("%v x %v ? %v \n", *conf, wkl, result.SLO <= slo)
+					result := c.Executor.Execute(*conf, wkl)
+					log.Printf("%v x %v ? %v \n", *conf, wkl, result.SLO <= slo)
 				}
 			}
 		}
@@ -42,19 +49,51 @@ func (c *Capacitor) BF(mode string, slo float32, wkls []string) {
 }
 
 func (c *Capacitor) MinExec(mode string, slo float32, wkls []string) {
-	mapa := c.dspace.CapacityBy(mode)
-	//fmt.Println(mapa)
-	for _, nodes := range *mapa {
+	mapa := c.Dspace.CapacityBy(mode)
+	for key, nodes := range *mapa {
 		c.ExecCategory(wkls, nodes, slo)
+		log.Println("Category[", key, "] - ", nodes)
 	}
 }
 
 func (c *Capacitor) ExecCategory(wkls []string, nodes Nodes, slo float32) {
 	matrix := buildMatrix(wkls, nodes)
-	//fmt.Println(matrix)
-	c.Exec(matrix, slo, 0, "")
-	//fmt.Printf("%v - %v\n", exec, path)
+	wg := new(sync.WaitGroup)
+	ch := make(chan ExecInfo)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		c.Exec(matrix, slo, 0, "", wg, ch)
+	}()
 
+	go func() {
+		wg.Wait()
+		close(ch)
+	}()
+
+	best := c.WaitExec(ch)
+
+	log.Printf("the winner is :%v", best)
+
+}
+
+func (c *Capacitor) WaitExec(ch chan ExecInfo) (best ExecInfo) {
+	best = ExecInfo{-1, ""}
+	for {
+		execInfo, more := <-ch
+		if more {
+			if best.Execs == -1 {
+				best = execInfo
+			}
+			if best.Execs > execInfo.Execs {
+				best = execInfo
+			}
+			log.Printf("%v, %v \n", execInfo.Execs, execInfo.Path)
+		} else {
+			break
+		}
+	}
+	return best
 }
 
 func buildMatrix(wkls []string, nodes Nodes) (matrix NodesInfo) {
@@ -78,30 +117,36 @@ func buildMatrix(wkls []string, nodes Nodes) (matrix NodesInfo) {
 	return iNodes
 }
 
-func (c *Capacitor) Exec(iNodes NodesInfo, slo float32, execs int, path string) (int, string) {
+func (c *Capacitor) Exec(iNodes NodesInfo, slo float32, execs int, path string, wg *sync.WaitGroup, ch chan ExecInfo) (int, string) {
+	endExecution := true
 	for key, node := range iNodes.matrix {
-		noneAvailable := true
 		if !(node.When != -1) {
-			noneAvailable = false
+			endExecution = false
 			cNodes := iNodes.Clone()
+			nExecs := execs
 			for _, conf := range node.Configs {
-				execs = execs + 1
+				nExecs = nExecs + 1
 
-				result := c.exec.Execute(*conf, node.WKL)
+				result := c.Executor.Execute(*conf, node.WKL)
 
-				cNodes.Mark(key, result.SLO <= slo, execs)
+				cNodes.Mark(key, result.SLO <= slo, nExecs)
 
 			}
-
-			c.Exec(*cNodes, slo, execs, fmt.Sprintf("%v%v,", path, key))
-		}
-		if noneAvailable {
-			//All executions!
-			fmt.Printf("#execs:%v, path:%v \n", execs, path)
-			return execs, path
+			wg.Add(1)
+			nPath := fmt.Sprintf("%v%v->", path, key)
+			go func() {
+				defer wg.Done()
+				c.Exec(*cNodes, slo, nExecs, nPath, wg, ch)
+			}()
 		}
 	}
-	return -1, "WARNING - NO NODE"
+	if endExecution {
+		//All executions!
+		ch <- ExecInfo{execs, path}
+		return execs, path
+	} else {
+		return -1, "MEANS NOTHING"
+	}
 }
 
 func (pNodes *NodesInfo) Mark(key string, metslo bool, exec int) {
@@ -130,7 +175,7 @@ func (pNodes *NodesInfo) Mark(key string, metslo bool, exec int) {
 			}
 		}
 	} else {
-		matrix[key].Candidate = false
+		matrix[key].Reject = true
 		for height := cHeight; height >= 1; height-- {
 			for i := cWKL; i < int64(pNodes.lenWKL); i++ {
 				key := fmt.Sprintf("%v_%v", height, i)
@@ -178,4 +223,17 @@ func (matrix NodesInfo) Clone() (clone *NodesInfo) {
 	pClone.lenWKL = matrix.lenWKL
 	pClone.lenNodes = matrix.lenNodes
 	return pClone
+}
+
+func (node NodeInfo) String() (str string) {
+	return fmt.Sprintf("{when:%v, exec:%v, candidate:%v, reject:%v}", node.When, node.Exec, node.Candidate, node.Reject)
+}
+
+func (nodes NodesInfo) String() (str string) {
+	str = fmt.Sprintf("{wkl:%v, heigh:%v, nodes:[\n\t", nodes.lenWKL, nodes.lenNodes)
+	for key, n := range nodes.matrix {
+		str = fmt.Sprintf("%v[%v]%v\n\t", str, key, n)
+	}
+	str = fmt.Sprintf("%v]}", str)
+	return
 }

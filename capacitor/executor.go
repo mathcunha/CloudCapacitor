@@ -26,7 +26,7 @@ type Executor interface {
 
 type MockExecutor struct {
 	FilePath string
-	records  map[string][]string
+	Records  map[string][]string
 }
 
 func (e *MockExecutor) Load() error {
@@ -46,7 +46,7 @@ func (e *MockExecutor) Load() error {
 		mapa[fmt.Sprintf("%v%v%v", v[0], v[1], v[2])] = []string{v[4], v[5], v[6]}
 	}
 
-	e.records = mapa
+	e.Records = mapa
 	return err
 }
 
@@ -57,7 +57,7 @@ func (e MockExecutor) Execute(config Configuration, wkl string) (result Result) 
 
 	key := fmt.Sprintf("%v%v%v", config.Size, config.VM.Name, wkl)
 
-	perf, has := e.records[key]
+	perf, has := e.Records[key]
 
 	if has {
 		p := Performance{}
