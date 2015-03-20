@@ -1,8 +1,8 @@
 package capacitor
 
 import (
+	"github.com/mathcunha/CloudCapacitor/sync2"
 	"log"
-	"sync"
 	"testing"
 )
 
@@ -85,7 +85,7 @@ func TestExec(t *testing.T) {
 	clone.matrix["2_5"].When = -1
 	clone.matrix["2_5"].Reject = false
 
-	wg := new(sync.WaitGroup)
+	wg := sync2.NewBlockWaitGroup(100)
 	wg.Add(1)
 	ch := make(chan ExecInfo)
 	go func() {

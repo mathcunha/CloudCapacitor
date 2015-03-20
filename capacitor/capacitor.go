@@ -2,10 +2,10 @@ package capacitor
 
 import (
 	"fmt"
+	"github.com/mathcunha/CloudCapacitor/sync2"
 	"log"
 	"strconv"
 	"strings"
-	"sync"
 )
 
 type Capacitor struct {
@@ -58,7 +58,7 @@ func (c *Capacitor) MinExec(mode string, slo float32, wkls []string) {
 
 func (c *Capacitor) ExecCategory(wkls []string, nodes Nodes, slo float32) {
 	matrix := buildMatrix(wkls, nodes)
-	wg := new(sync.WaitGroup)
+	wg := sync2.NewBlockWaitGroup(100)
 	ch := make(chan ExecInfo)
 	wg.Add(1)
 	go func() {
@@ -117,7 +117,7 @@ func buildMatrix(wkls []string, nodes Nodes) (matrix NodesInfo) {
 	return iNodes
 }
 
-func (c *Capacitor) Exec(iNodes NodesInfo, slo float32, execs int, path string, wg *sync.WaitGroup, ch chan ExecInfo) (int, string) {
+func (c *Capacitor) Exec(iNodes NodesInfo, slo float32, execs int, path string, wg *sync2.BlockWaitGroup, ch chan ExecInfo) (int, string) {
 	endExecution := true
 	for key, node := range iNodes.matrix {
 		if !(node.When != -1) {
@@ -132,12 +132,16 @@ func (c *Capacitor) Exec(iNodes NodesInfo, slo float32, execs int, path string, 
 				cNodes.Mark(key, result.SLO <= slo, nExecs)
 
 			}
-			wg.Add(1)
+			_, err := wg.Add(1)
 			nPath := fmt.Sprintf("%v%v->", path, key)
-			go func() {
-				defer wg.Done()
+			if err == nil {
+				go func() {
+					defer wg.Done()
+					c.Exec(*cNodes, slo, nExecs, nPath, wg, ch)
+				}()
+			} else {
 				c.Exec(*cNodes, slo, nExecs, nPath, wg, ch)
-			}()
+			}
 		}
 	}
 	if endExecution {
