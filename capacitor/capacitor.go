@@ -57,15 +57,30 @@ func (c *Capacitor) MinExec(mode string, slo float32, wkls []string) {
 }
 
 func (c *Capacitor) ExecCategory(wkls []string, nodes Nodes, slo float32) {
+	numConfigs := 0
+	for _, node := range nodes {
+		numConfigs = numConfigs + len(node.Configs)
+	}
+	max := len(wkls) * numConfigs
+	log.Printf("Max iterations :%v \n", max)
+	for i := 1; i <= max; i++ {
+		log.Printf("Now trying %v Iteration(s) \n", i)
+		if c.FindFirstWinner(wkls, nodes, slo, i) {
+			return
+		}
+	}
+}
+
+func (c *Capacitor) FindFirstWinner(wkls []string, nodes Nodes, slo float32, maxIts int) (find bool) {
 	matrix := buildMatrix(wkls, nodes)
-	wg := sync2.NewBlockWaitGroup(100)
+	wg := sync2.NewBlockWaitGroup(100000)
 	ch := make(chan ExecInfo)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		c.Exec(matrix, slo, 0, "", wg, ch)
+		c.Exec(matrix, slo, 0, "", wg, ch, 0, maxIts)
 	}()
-
+	find = false
 	go func() {
 		wg.Wait()
 		close(ch)
@@ -73,8 +88,9 @@ func (c *Capacitor) ExecCategory(wkls []string, nodes Nodes, slo float32) {
 
 	best := c.WaitExec(ch)
 
-	log.Printf("the winner is :%v", best)
+	find = best.Execs != -1
 
+	return
 }
 
 func (c *Capacitor) WaitExec(ch chan ExecInfo) (best ExecInfo) {
@@ -117,39 +133,43 @@ func buildMatrix(wkls []string, nodes Nodes) (matrix NodesInfo) {
 	return iNodes
 }
 
-func (c *Capacitor) Exec(iNodes NodesInfo, slo float32, execs int, path string, wg *sync2.BlockWaitGroup, ch chan ExecInfo) (int, string) {
-	endExecution := true
-	for key, node := range iNodes.matrix {
-		if !(node.When != -1) {
-			endExecution = false
-			cNodes := iNodes.Clone()
-			nExecs := execs
-			for _, conf := range node.Configs {
-				nExecs = nExecs + 1
+func (c *Capacitor) Exec(iNodes NodesInfo, slo float32, execs int, path string, wg *sync2.BlockWaitGroup, ch chan ExecInfo, it int, maxIts int) (int, string) {
+	if it <= maxIts {
+		endExecution := true
+		for key, node := range iNodes.matrix {
+			if !(node.When != -1) {
+				endExecution = false
+				cNodes := iNodes.Clone()
+				nExecs := execs
+				for _, conf := range node.Configs {
+					nExecs = nExecs + 1
 
-				result := c.Executor.Execute(*conf, node.WKL)
+					result := c.Executor.Execute(*conf, node.WKL)
 
-				cNodes.Mark(key, result.SLO <= slo, nExecs)
+					cNodes.Mark(key, result.SLO <= slo, nExecs)
 
-			}
-			_, err := wg.Add(1)
-			nPath := fmt.Sprintf("%v%v->", path, key)
-			if err == nil {
-				go func() {
-					defer wg.Done()
-					c.Exec(*cNodes, slo, nExecs, nPath, wg, ch)
-				}()
-			} else {
-				c.Exec(*cNodes, slo, nExecs, nPath, wg, ch)
+				}
+				_, err := wg.Add(1)
+				nPath := fmt.Sprintf("%v%v->", path, key)
+				if err == nil {
+					go func() {
+						defer wg.Done()
+						c.Exec(*cNodes, slo, nExecs, nPath, wg, ch, it+1, maxIts)
+					}()
+				} else {
+					c.Exec(*cNodes, slo, nExecs, nPath, wg, ch, it+1, maxIts)
+				}
 			}
 		}
-	}
-	if endExecution {
-		//All executions!
-		ch <- ExecInfo{execs, path}
-		return execs, path
+		if endExecution {
+			//All executions!
+			ch <- ExecInfo{execs, path}
+			return execs, path
+		} else {
+			return -1, "NOTHING"
+		}
 	} else {
-		return -1, "MEANS NOTHING"
+		return -1, "MAX ITs REACHED"
 	}
 }
 
