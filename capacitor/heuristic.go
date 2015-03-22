@@ -41,7 +41,6 @@ type ShortestPath struct {
 	slo   float32
 	it    int
 	maxIt int
-	wg    *sync2.BlockWaitGroup
 }
 
 func NewShortestPath(c *Capacitor) (h *ShortestPath) {
@@ -73,10 +72,6 @@ func (h *ShortestPath) Exec(mode string, slo float32, wkls []string) {
 	}
 }
 
-func (h *ShortestPath) InitControlers() {
-	h.wg = sync2.NewBlockWaitGroup(100000)
-}
-
 func (h *ShortestPath) PostExecs(nexts []nextExec) (current []currentExec) {
 	for _, next := range nexts {
 		for key, _ := range next.nodes.matrix {
@@ -94,23 +89,28 @@ func (h *ShortestPath) ExecCategory(wkls []string, nodes Nodes) {
 	h.maxIt = len(wkls) * numConfigs
 	log.Printf("Max iterations :%v \n", h.maxIt)
 
-	h.InitControlers()
-
 	nexts := []nextExec{nextExec{buildMatrix(wkls, nodes), 0, "", 1}}
-	var best ExecInfo
 
 	for i := 1; i <= h.maxIt; i++ {
+		wg := sync2.NewBlockWaitGroup(100000)
+		chBest := make(chan ExecInfo)
+
 		log.Printf("Now trying %v Iteration(s) \n", i)
 
-		h.wg.Add(1)
+		wg.Add(1)
 		go func() {
-			defer h.wg.Done()
-			nexts, best = h.findShortestPath(h.PostExecs(nexts))
+			defer wg.Done()
+			nexts = h.findShortestPath(h.PostExecs(nexts), wg, chBest)
 		}()
 
-		h.wg.Wait()
+		go func() {
+			wg.Wait()
+			close(chBest)
+		}()
 
-		if nexts == nil {
+		best := h.GetBest(chBest)
+
+		if best.Execs != -1 {
 			log.Printf("the winner is %v", best)
 			return
 		}
@@ -119,7 +119,7 @@ func (h *ShortestPath) ExecCategory(wkls []string, nodes Nodes) {
 
 }
 
-func (h *ShortestPath) findShortestPath(current []currentExec) (nexts []nextExec, shortest ExecInfo) {
+func (h *ShortestPath) findShortestPath(current []currentExec, wg *sync2.BlockWaitGroup, chBest chan ExecInfo) (nexts []nextExec) {
 	for _, ex := range current {
 		node := ex.nodes.matrix[ex.key]
 		if !(node.When != -1) {
@@ -146,22 +146,31 @@ func (h *ShortestPath) findShortestPath(current []currentExec) (nexts []nextExec
 				nexts = append(nexts, *nEx)
 			} else {
 				//All executions!
-				return nil, ExecInfo{nExecs, nPath}
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					log.Printf("winner!! %v,%v", nExecs, nPath)
+					chBest <- ExecInfo{nExecs, nPath}
+				}()
+				//return nil
 			}
 		}
 	}
 
-	return nexts, ExecInfo{-1, ""}
+	return nexts
 }
 
-func (h *ShortestPath) GetBest() (best ExecInfo) {
+func (h *ShortestPath) GetBest(chBest chan ExecInfo) (best ExecInfo) {
 	best = ExecInfo{-1, ""}
-
-	/*	for len(h.chEndExec) > 0 {
-		execInfo := <-h.chEndExec
-		best = execInfo
-		log.Printf("%v, %v \n", execInfo.Execs, execInfo.Path)
-	}*/
+	for {
+		execInfo, more := <-chBest
+		if more {
+			best = execInfo
+			log.Printf("%v, %v \n", execInfo.Execs, execInfo.Path)
+		} else {
+			break
+		}
+	}
 
 	return best
 }
