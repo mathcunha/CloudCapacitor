@@ -74,8 +74,10 @@ func (h *ShortestPath) Exec(mode string, slo float32, wkls []string) {
 
 func (h *ShortestPath) PostExecs(nexts []nextExec) (current []currentExec) {
 	for _, next := range nexts {
-		for key, _ := range next.nodes.matrix {
-			current = append(current, currentExec{next.nodes, key, next.execs, next.path, next.it})
+		for key, node := range next.nodes.matrix {
+			if node.When == -1 {
+				current = append(current, currentExec{next.nodes, key, next.execs, next.path, next.it})
+			}
 		}
 	}
 	return
@@ -120,6 +122,8 @@ func (h *ShortestPath) ExecCategory(wkls []string, nodes Nodes) {
 }
 
 func (h *ShortestPath) findShortestPath(current []currentExec, wg *sync2.BlockWaitGroup, chBest chan ExecInfo) (nexts []nextExec) {
+	novo := new([]nextExec)
+	nexts = *novo
 	for _, ex := range current {
 		node := ex.nodes.matrix[ex.key]
 		if !(node.When != -1) {
