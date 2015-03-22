@@ -123,6 +123,7 @@ func (h *ShortestPath) ExecCategory(wkls []string, nodes Nodes) {
 
 func (h *ShortestPath) findShortestPath(current []currentExec, wg *sync2.BlockWaitGroup, chBest chan ExecInfo) (nexts []nextExec) {
 	novo := new([]nextExec)
+	bingo := false
 	nexts = *novo
 	for _, ex := range current {
 		node := ex.nodes.matrix[ex.key]
@@ -142,14 +143,17 @@ func (h *ShortestPath) findShortestPath(current []currentExec, wg *sync2.BlockWa
 			//c.Exec(*cNodes, slo, nExecs, nPath, wg, ch, it+1, maxIts)
 
 			if h.c.HasMore(cNodes) {
-				nEx := new(nextExec)
-				nEx.nodes = *cNodes
-				nEx.execs = nExecs
-				nEx.path = nPath
-				nEx.it = ex.it + 1
-				nexts = append(nexts, *nEx)
+				if !bingo {
+					nEx := new(nextExec)
+					nEx.nodes = *cNodes
+					nEx.execs = nExecs
+					nEx.path = nPath
+					nEx.it = ex.it + 1
+					nexts = append(nexts, *nEx)
+				}
 			} else {
 				//All executions!
+				bingo = true
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
