@@ -3,7 +3,6 @@ package capacitor
 import (
 	"fmt"
 	"github.com/mathcunha/CloudCapacitor/sync2"
-	"log"
 	"strconv"
 	"strings"
 )
@@ -28,90 +27,6 @@ type NodeInfo struct {
 	When      int
 }
 
-type ExecInfo struct {
-	Execs int
-	Path  string
-}
-
-//Brutal force heuristic
-func (c *Capacitor) BF(mode string, slo float32, wkls []string) {
-	mapa := c.Dspace.CapacityBy(mode)
-	for _, nodes := range *mapa {
-		for _, node := range nodes {
-			for _, conf := range node.Configs {
-				for _, wkl := range wkls {
-					result := c.Executor.Execute(*conf, wkl)
-					log.Printf("%v x %v ? %v \n", *conf, wkl, result.SLO <= slo)
-				}
-			}
-		}
-	}
-}
-
-func (c *Capacitor) MinExec(mode string, slo float32, wkls []string) {
-	mapa := c.Dspace.CapacityBy(mode)
-	for key, nodes := range *mapa {
-		c.ExecCategory(wkls, nodes, slo)
-		log.Println("Category[", key, "] - ", nodes)
-	}
-}
-
-func (c *Capacitor) ExecCategory(wkls []string, nodes Nodes, slo float32) {
-	numConfigs := 0
-	for _, node := range nodes {
-		numConfigs = numConfigs + len(node.Configs)
-	}
-	max := len(wkls) * numConfigs
-	log.Printf("Max iterations :%v \n", max)
-	for i := 1; i <= max; i++ {
-		log.Printf("Now trying %v Iteration(s) \n", i)
-		if c.FindFirstWinner(wkls, nodes, slo, i) {
-			return
-		}
-	}
-}
-
-func (c *Capacitor) FindFirstWinner(wkls []string, nodes Nodes, slo float32, maxIts int) (find bool) {
-	matrix := buildMatrix(wkls, nodes)
-	wg := sync2.NewBlockWaitGroup(100000)
-	ch := make(chan ExecInfo)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		c.Exec(matrix, slo, 0, "", wg, ch, 0, maxIts)
-	}()
-	find = false
-	go func() {
-		wg.Wait()
-		close(ch)
-	}()
-
-	best := c.WaitExec(ch)
-
-	find = best.Execs != -1
-
-	return
-}
-
-func (c *Capacitor) WaitExec(ch chan ExecInfo) (best ExecInfo) {
-	best = ExecInfo{-1, ""}
-	for {
-		execInfo, more := <-ch
-		if more {
-			if best.Execs == -1 {
-				best = execInfo
-			}
-			if best.Execs > execInfo.Execs {
-				best = execInfo
-			}
-			log.Printf("%v, %v \n", execInfo.Execs, execInfo.Path)
-		} else {
-			break
-		}
-	}
-	return best
-}
-
 func buildMatrix(wkls []string, nodes Nodes) (matrix NodesInfo) {
 	iNodes := NodesInfo{make(map[string]*NodeInfo), -1, -1}
 	max := -1
@@ -131,6 +46,15 @@ func buildMatrix(wkls []string, nodes Nodes) (matrix NodesInfo) {
 	iNodes.lenWKL = len(wkls)
 	iNodes.lenNodes = max
 	return iNodes
+}
+
+func (c *Capacitor) HasMore(nodes *NodesInfo) bool {
+	for _, node := range nodes.matrix {
+		if node.When == -1 {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Capacitor) Exec(iNodes NodesInfo, slo float32, execs int, path string, wg *sync2.BlockWaitGroup, ch chan ExecInfo, it int, maxIts int) (int, string) {

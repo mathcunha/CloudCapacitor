@@ -38,5 +38,6 @@ func main() {
 	}
 	log.Printf("%v,%v,%v,%v\n", prop, slo, price, size)
 	c := capacitor.Capacitor{dspace, m}
-	c.MinExec(prop, float32(slo), []string{"100", "200", "300", "400", "500", "600", "700", "800", "900", "1000"})
+	h := capacitor.NewShortestPath(&c)
+	h.Exec(prop, float32(slo), []string{"100", "200", "300", "400", "500", "600", "700", "800", "900", "1000"})
 }
