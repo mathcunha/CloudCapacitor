@@ -102,7 +102,7 @@ func (h *ShortestPath) ExecCategory(wkls []string, nodes Nodes) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			nexts = h.findShortestPath(h.PostExecs(nexts), wg, chBest)
+			nexts = h.findShortestPath(h.PostExecs(nexts), wg, chBest, h.maxIt)
 		}()
 
 		go func() {
@@ -121,10 +121,11 @@ func (h *ShortestPath) ExecCategory(wkls []string, nodes Nodes) {
 
 }
 
-func (h *ShortestPath) findShortestPath(current []currentExec, wg *sync2.BlockWaitGroup, chBest chan ExecInfo) (nexts []nextExec) {
+func (h *ShortestPath) findShortestPath(current []currentExec, wg *sync2.BlockWaitGroup, chBest chan ExecInfo, numConfigs int) (nexts []nextExec) {
 	novo := new([]nextExec)
 	bingo := false
 	nexts = *novo
+	lessNodes := numConfigs
 	for _, ex := range current {
 		node := ex.nodes.matrix[ex.key]
 		if !(node.When != -1) {
@@ -144,12 +145,24 @@ func (h *ShortestPath) findShortestPath(current []currentExec, wg *sync2.BlockWa
 
 			if h.c.HasMore(cNodes) {
 				if !bingo {
-					nEx := new(nextExec)
-					nEx.nodes = *cNodes
-					nEx.execs = nExecs
-					nEx.path = nPath
-					nEx.it = ex.it + 1
-					nexts = append(nexts, *nEx)
+					leftNodes := h.c.NodesLeft(cNodes)
+					if lessNodes == leftNodes {
+						nEx := new(nextExec)
+						nEx.nodes = *cNodes
+						nEx.execs = nExecs
+						nEx.path = nPath
+						nEx.it = ex.it + 1
+						nexts = append(nexts, *nEx)
+					}
+					if lessNodes > leftNodes {
+						lessNodes = leftNodes
+						nEx := new(nextExec)
+						nEx.nodes = *cNodes
+						nEx.execs = nExecs
+						nEx.path = nPath
+						nEx.it = ex.it + 1
+						nexts = []nextExec{*nEx}
+					}
 				}
 			} else {
 				//All executions!

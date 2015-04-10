@@ -57,6 +57,15 @@ func (c *Capacitor) HasMore(nodes *NodesInfo) bool {
 	return false
 }
 
+func (c *Capacitor) NodesLeft(nodes *NodesInfo) (count int) {
+	for _, node := range nodes.matrix {
+		if node.When == -1 {
+			count++
+		}
+	}
+	return
+}
+
 func (c *Capacitor) Exec(iNodes NodesInfo, slo float32, execs int, path string, wg *sync2.BlockWaitGroup, ch chan ExecInfo, it int, maxIts int) (int, string) {
 	if it <= maxIts {
 		endExecution := true
