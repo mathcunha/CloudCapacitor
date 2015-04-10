@@ -2,7 +2,6 @@ package capacitor
 
 import (
 	"fmt"
-	"github.com/mathcunha/CloudCapacitor/sync2"
 	"strconv"
 	"strings"
 )
@@ -64,46 +63,6 @@ func (c *Capacitor) NodesLeft(nodes *NodesInfo) (count int) {
 		}
 	}
 	return
-}
-
-func (c *Capacitor) Exec(iNodes NodesInfo, slo float32, execs int, path string, wg *sync2.BlockWaitGroup, ch chan ExecInfo, it int, maxIts int) (int, string) {
-	if it <= maxIts {
-		endExecution := true
-		for key, node := range iNodes.matrix {
-			if !(node.When != -1) {
-				endExecution = false
-				cNodes := iNodes.Clone()
-				nExecs := execs
-				for _, conf := range node.Configs {
-					nExecs = nExecs + 1
-
-					result := c.Executor.Execute(*conf, node.WKL)
-
-					cNodes.Mark(key, result.SLO <= slo, nExecs)
-
-				}
-				_, err := wg.Add(1)
-				nPath := fmt.Sprintf("%v%v->", path, key)
-				if err == nil {
-					go func() {
-						defer wg.Done()
-						c.Exec(*cNodes, slo, nExecs, nPath, wg, ch, it+1, maxIts)
-					}()
-				} else {
-					c.Exec(*cNodes, slo, nExecs, nPath, wg, ch, it+1, maxIts)
-				}
-			}
-		}
-		if endExecution {
-			//All executions!
-			ch <- ExecInfo{execs, path}
-			return execs, path
-		} else {
-			return -1, "NOTHING"
-		}
-	} else {
-		return -1, "MAX ITs REACHED"
-	}
 }
 
 func (pNodes *NodesInfo) Mark(key string, metslo bool, exec int) {

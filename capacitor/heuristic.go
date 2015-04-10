@@ -4,26 +4,19 @@ import (
 	"fmt"
 	"github.com/mathcunha/CloudCapacitor/sync2"
 	"log"
+	"strconv"
+	"strings"
 )
 
 type ExecInfo struct {
-	Execs int
-	Path  string
-}
-
-type currentExec struct {
-	nodes NodesInfo
-	key   string
 	execs int
 	path  string
 	it    int
 }
 
-type nextExec struct {
+type NodeExec struct {
 	nodes NodesInfo
-	execs int
-	path  string
-	it    int
+	ExecInfo
 }
 
 type Heuristic interface {
@@ -66,21 +59,9 @@ func (bf *BrutalForce) Exec(mode string, slo float32, wkls []string) {
 func (h *ShortestPath) Exec(mode string, slo float32, wkls []string) {
 	mapa := h.c.Dspace.CapacityBy(mode)
 	h.slo = slo
-	for key, nodes := range *mapa {
+	for _, nodes := range *mapa {
 		h.ExecCategory(wkls, nodes)
-		log.Println("Category[", key, "] - ", nodes)
 	}
-}
-
-func (h *ShortestPath) PostExecs(nexts []nextExec) (current []currentExec) {
-	for _, next := range nexts {
-		for key, node := range next.nodes.matrix {
-			if node.When == -1 {
-				current = append(current, currentExec{next.nodes, key, next.execs, next.path, next.it})
-			}
-		}
-	}
-	return
 }
 
 func (h *ShortestPath) ExecCategory(wkls []string, nodes Nodes) {
@@ -89,20 +70,17 @@ func (h *ShortestPath) ExecCategory(wkls []string, nodes Nodes) {
 		numConfigs = numConfigs + len(node.Configs)
 	}
 	h.maxIt = len(wkls) * numConfigs
-	log.Printf("Max iterations :%v \n", h.maxIt)
 
-	nexts := []nextExec{nextExec{buildMatrix(wkls, nodes), 0, "", 1}}
+	nexts := []NodeExec{NodeExec{buildMatrix(wkls, nodes), ExecInfo{0, "", 0}}}
 
-	for i := 1; i <= h.maxIt; i++ {
+	for i := 0; i <= h.maxIt; i++ {
 		wg := sync2.NewBlockWaitGroup(100000)
 		chBest := make(chan ExecInfo)
-
-		log.Printf("Now trying %v Iteration(s) \n", i)
 
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			nexts = h.findShortestPath(h.PostExecs(nexts), wg, chBest, h.maxIt)
+			nexts = h.findShortestPath(nexts, wg, chBest, h.maxIt)
 		}()
 
 		go func() {
@@ -112,8 +90,8 @@ func (h *ShortestPath) ExecCategory(wkls []string, nodes Nodes) {
 
 		best := h.GetBest(chBest)
 
-		if best.Execs != -1 {
-			log.Printf("the winner is %v", best)
+		if best.execs != -1 {
+			PrintExecPath(best, wkls, nodes)
 			return
 		}
 
@@ -121,59 +99,76 @@ func (h *ShortestPath) ExecCategory(wkls []string, nodes Nodes) {
 
 }
 
-func (h *ShortestPath) findShortestPath(current []currentExec, wg *sync2.BlockWaitGroup, chBest chan ExecInfo, numConfigs int) (nexts []nextExec) {
-	novo := new([]nextExec)
+func PrintExecPath(winner ExecInfo, wkls []string, nodes Nodes) {
+	path := strings.Split(winner.path, "->")
+	str := ""
+	execs := 0
+	for _, key := range path {
+		s := strings.Split(key, "_")
+		if len(s) > 1 {
+			cHeight, _ := strconv.ParseInt(s[0], 0, 64)
+			cWKL, _ := strconv.ParseInt(s[1], 0, 64)
+			str = fmt.Sprintf("%vWorkload:%v, Configs:%v\n", str, wkls[cWKL], nodes[cHeight-1].Configs)
+			execs = execs + len(nodes[cHeight-1].Configs)
+		}
+	}
+	str = fmt.Sprintf("%vTotal Execs:%v", str, execs)
+	log.Printf(str)
+}
+
+func (h *ShortestPath) findShortestPath(current []NodeExec, wg *sync2.BlockWaitGroup, chBest chan ExecInfo, numConfigs int) (nexts []NodeExec) {
+	novo := new([]NodeExec)
 	bingo := false
 	nexts = *novo
 	lessNodes := numConfigs
 	for _, ex := range current {
-		node := ex.nodes.matrix[ex.key]
-		if !(node.When != -1) {
-			cNodes := ex.nodes.Clone()
-			nExecs := ex.execs
-			result := Result{}
-			for _, conf := range node.Configs {
-				nExecs = nExecs + 1
+		for key, node := range ex.nodes.matrix {
+			if !(node.When != -1) {
+				cNodes := ex.nodes.Clone()
+				nExecs := ex.execs
+				result := Result{}
+				for _, conf := range node.Configs {
+					nExecs = nExecs + 1
 
-				result = h.c.Executor.Execute(*conf, node.WKL)
+					result = h.c.Executor.Execute(*conf, node.WKL)
 
-				cNodes.Mark(ex.key, result.SLO <= h.slo, nExecs)
+					cNodes.Mark(key, result.SLO <= h.slo, nExecs)
 
-			}
-			nPath := fmt.Sprintf("%v%v->", ex.path, ex.key)
-			//c.Exec(*cNodes, slo, nExecs, nPath, wg, ch, it+1, maxIts)
-
-			if h.c.HasMore(cNodes) {
-				if !bingo {
-					leftNodes := h.c.NodesLeft(cNodes)
-					if lessNodes == leftNodes {
-						nEx := new(nextExec)
-						nEx.nodes = *cNodes
-						nEx.execs = nExecs
-						nEx.path = nPath
-						nEx.it = ex.it + 1
-						nexts = append(nexts, *nEx)
-					}
-					if lessNodes > leftNodes {
-						lessNodes = leftNodes
-						nEx := new(nextExec)
-						nEx.nodes = *cNodes
-						nEx.execs = nExecs
-						nEx.path = nPath
-						nEx.it = ex.it + 1
-						nexts = []nextExec{*nEx}
-					}
 				}
-			} else {
-				//All executions!
-				bingo = true
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					log.Printf("winner!! %v,%v", nExecs, nPath)
-					chBest <- ExecInfo{nExecs, nPath}
-				}()
-				//return nil
+				nPath := fmt.Sprintf("%v%v->", ex.path, key)
+				//c.Exec(*cNodes, slo, nExecs, nPath, wg, ch, it+1, maxIts)
+
+				if h.c.HasMore(cNodes) {
+					if !bingo {
+						leftNodes := h.c.NodesLeft(cNodes)
+						if lessNodes == leftNodes {
+							nEx := new(NodeExec)
+							nEx.nodes = *cNodes
+							nEx.execs = nExecs
+							nEx.path = nPath
+							nEx.it = ex.it + 1
+							nexts = append(nexts, *nEx)
+						}
+						if lessNodes > leftNodes {
+							lessNodes = leftNodes
+							nEx := new(NodeExec)
+							nEx.nodes = *cNodes
+							nEx.execs = nExecs
+							nEx.path = nPath
+							nEx.it = ex.it + 1
+							nexts = []NodeExec{*nEx}
+						}
+					}
+				} else {
+					//All executions!
+					bingo = true
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
+						chBest <- ExecInfo{nExecs, nPath, -1}
+					}()
+					//return nil
+				}
 			}
 		}
 	}
@@ -182,12 +177,11 @@ func (h *ShortestPath) findShortestPath(current []currentExec, wg *sync2.BlockWa
 }
 
 func (h *ShortestPath) GetBest(chBest chan ExecInfo) (best ExecInfo) {
-	best = ExecInfo{-1, ""}
+	best = ExecInfo{-1, "", -1}
 	for {
 		execInfo, more := <-chBest
 		if more {
 			best = execInfo
-			log.Printf("%v, %v \n", execInfo.Execs, execInfo.Path)
 		} else {
 			break
 		}
