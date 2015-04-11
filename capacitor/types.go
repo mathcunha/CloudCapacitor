@@ -32,6 +32,10 @@ func (c *Configuration) CPU() float32 {
 	return float32(c.Size) * c.VM.CPU
 }
 
+func (c *Configuration) Strict() float32 {
+	return c.VM.Mem
+}
+
 func (vm VM) String() string {
 	return fmt.Sprintf("{category:%v, cpu:%v , mem:%v, price:%v}", vm.Category, vm.CPU, vm.Mem, vm.Price)
 }

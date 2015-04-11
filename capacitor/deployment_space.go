@@ -10,8 +10,8 @@ import (
 type Node struct {
 	ID     string
 	Height int
-	Higher *Node
-	Lower  *Node
+	Higher Nodes
+	Lower  Nodes
 	Configs
 }
 
@@ -25,13 +25,15 @@ type Configs []*Configuration
 type byMem struct{ Configs }
 type byCPU struct{ Configs }
 type byPrice struct{ Configs }
+type byStrict struct{ Configs }
 
 func (s Configs) Len() int      { return len(s) }
 func (s Configs) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
-func (s byMem) Less(i, j int) bool   { return s.Configs[i].Mem() < s.Configs[j].Mem() }
-func (s byCPU) Less(i, j int) bool   { return s.Configs[i].CPU() < s.Configs[j].CPU() }
-func (s byPrice) Less(i, j int) bool { return s.Configs[i].Price() < s.Configs[j].Price() }
+func (s byMem) Less(i, j int) bool    { return s.Configs[i].Mem() < s.Configs[j].Mem() }
+func (s byCPU) Less(i, j int) bool    { return s.Configs[i].CPU() < s.Configs[j].CPU() }
+func (s byPrice) Less(i, j int) bool  { return s.Configs[i].Price() < s.Configs[j].Price() }
+func (s byStrict) Less(i, j int) bool { return s.Configs[i].Strict() < s.Configs[j].Strict() }
 
 func NewDeploymentSpace(vms *[]VM, price float32, size int) (dspace DeploymentSpace) {
 	mapa := make(map[string]Configs)
@@ -61,11 +63,60 @@ func (dspace *DeploymentSpace) CapacityBy(prop string) (list *map[string]Nodes) 
 			sort.Sort(byCPU{v})
 		case "Price":
 			sort.Sort(byPrice{v})
+		case "Strict":
+			sort.Sort(byStrict{v})
+			return dspace.buildNodesStrict(prop)
 		}
 
 	}
 
 	return dspace.buildNodes(prop)
+}
+
+func (dspace *DeploymentSpace) buildNodesStrict(prop string) *map[string]Nodes {
+	mapa := make(map[string]Nodes)
+
+	for cat, configs := range *dspace.configs {
+		nodes := make([]*Node, len(configs), len(configs))
+		for i, c := range configs {
+			nodes[i] = new(Node)
+			nodes[i].ID = fmt.Sprintf("%v_%v", c.Size, c.Name)
+			nodes[i].Configs = Configs{c}
+			if i == 0 {
+				mapa[cat] = Nodes{}
+			}
+			mapa[cat] = append(mapa[cat], nodes[i])
+		}
+		for _, out := range nodes {
+			for _, in := range nodes {
+				if out.Configs[0].Name == in.Configs[0].Name {
+					if out.Configs[0].Size+1 == in.Configs[0].Size {
+						if out.Lower == nil {
+							out.Lower = Nodes{}
+						}
+						out.Lower = append(out.Lower, in)
+						if in.Higher == nil {
+							in.Higher = Nodes{}
+						}
+						in.Higher = append(in.Higher, out)
+					}
+				}
+				if out.Configs[0].Size == in.Configs[0].Size {
+					if out.Configs[0].Strict()*2 == in.Configs[0].Strict() {
+						if out.Lower == nil {
+							out.Lower = Nodes{}
+						}
+						out.Lower = append(out.Lower, in)
+						if in.Higher == nil {
+							in.Higher = Nodes{}
+						}
+						in.Higher = append(in.Higher, out)
+					}
+				}
+			}
+		}
+	}
+	return &mapa
 }
 
 func (dspace *DeploymentSpace) buildNodes(prop string) *map[string]Nodes {
@@ -104,8 +155,8 @@ func updateMap(mapa *map[string]Nodes, node *Node, cat string) {
 		max := len(n)
 		nodes := append(n, node)
 
-		nodes[max].Higher = nodes[max-1]
-		nodes[max-1].Lower = nodes[max]
+		nodes[max].Higher = Nodes{nodes[max-1]}
+		nodes[max-1].Lower = Nodes{nodes[max]}
 		nodes[max].Height = max + 1
 
 		m[cat] = nodes
@@ -140,12 +191,24 @@ func (dspace DeploymentSpace) String() string {
 func (n Node) String() string {
 	str := fmt.Sprintf("{ id:%v, height:%v", n.ID, n.Height)
 	if n.Higher != nil {
-		str = fmt.Sprintf("%v, higher:%v", str, n.Higher.ID)
+		str = fmt.Sprintf("%v, higher:", str)
+		for i, h := range n.Higher {
+			str = fmt.Sprintf("%v%v", str, h.ID)
+			if i+1 != len(n.Higher) {
+				str = fmt.Sprintf("%v,", str)
+			}
+		}
 	} else {
 		str = fmt.Sprintf("%v, root:true", str)
 	}
 	if n.Lower != nil {
-		str = fmt.Sprintf("%v, lower:%v", str, n.Lower.ID)
+		str = fmt.Sprintf("%v, lower:", str)
+		for i, l := range n.Lower {
+			str = fmt.Sprintf("%v%v", str, l.ID)
+			if i+1 != len(n.Lower) {
+				str = fmt.Sprintf("%v,", str)
+			}
+		}
 	} else {
 		str = fmt.Sprintf("%v, leaf:true", str)
 	}
