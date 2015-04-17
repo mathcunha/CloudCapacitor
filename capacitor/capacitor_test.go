@@ -25,15 +25,15 @@ func TestMark(t *testing.T) {
 	log.Println(matrix)
 
 	clone := matrix.Clone()
-	clone.Mark("1_2", true, 1)
-	clone.Mark("1_1", false, 2)
+	clone.Mark("3.75_2", true, 1)
+	clone.Mark("3.75_1", false, 2)
 	log.Println(clone)
 
 	matrix = buildMatrix([]string{"100", "200", "300", "400", "500", "600", "700", "800", "900", "1000"}, M["m3"])
 	clone = matrix.Clone()
 	log.Println(M["m3"])
 	log.Println(matrix)
-	clone.Mark("2_1", true, 1)
-	clone.Mark("2_1", false, 2)
+	clone.Mark("7.50_1", true, 1)
+	clone.Mark("7.50_1", false, 2)
 	log.Println(clone)
 }

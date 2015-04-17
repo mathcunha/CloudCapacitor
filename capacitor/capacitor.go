@@ -38,7 +38,7 @@ func buildMatrix(wkls []string, nodes Nodes) (matrix NodesInfo) {
 			n.Reject = false
 			n.Candidate = false
 			n.When = -1
-			iNodes.matrix[fmt.Sprintf("%v_%v", node.Height, i)] = n
+			iNodes.matrix[fmt.Sprintf("%v_%v", node.ID, i)] = n
 		}
 		max = node.Height
 	}
@@ -65,9 +65,46 @@ func (c *Capacitor) NodesLeft(nodes *NodesInfo) (count int) {
 	return
 }
 
+func (pNodes *NodesInfo) MarkCandidate(n *Node, metslo bool, exec int, cWKL int) {
+	if n != nil {
+		iNodes := *pNodes
+		matrix := iNodes.matrix
+		for i := cWKL; i >= 0; i-- {
+			key := fmt.Sprintf("%v_%v", n.ID, i)
+			nodeInfo := matrix[key]
+			if nodeInfo.When == -1 {
+				nodeInfo.Candidate = true
+				nodeInfo.When = exec
+				//fmt.Println("\tmarcando ", key, " candidato ")
+			}
+		}
+		for _, node := range n.Lower {
+			pNodes.MarkCandidate(node, metslo, exec, cWKL)
+		}
+	}
+}
+
+func (pNodes *NodesInfo) MarkReject(n *Node, metslo bool, exec int, cWKL int) {
+	if n != nil {
+		iNodes := *pNodes
+		matrix := iNodes.matrix
+		for i := cWKL; i < pNodes.lenWKL; i++ {
+			key := fmt.Sprintf("%v_%v", n.ID, i)
+			nodeInfo := matrix[key]
+			if nodeInfo.When == -1 {
+				nodeInfo.Reject = true
+				nodeInfo.When = exec
+				//fmt.Println("\tmarcando ", key, " rejeitado ")
+			}
+		}
+		for _, node := range n.Higher {
+			pNodes.MarkReject(node, metslo, exec, cWKL)
+		}
+	}
+}
+
 func (pNodes *NodesInfo) Mark(key string, metslo bool, exec int) {
 	s := strings.Split(key, "_")
-	cHeight, _ := strconv.ParseInt(s[0], 0, 64)
 	cWKL, _ := strconv.ParseInt(s[1], 0, 64)
 	//fmt.Printf("INI MARK\n")
 	//fmt.Printf("%v ? %v\n", key, metslo)
@@ -79,30 +116,10 @@ func (pNodes *NodesInfo) Mark(key string, metslo bool, exec int) {
 
 	if metslo {
 		matrix[key].Candidate = true
-		for height := cHeight; height <= int64(pNodes.lenNodes); height++ {
-			for i := cWKL; i >= 0; i-- {
-				key := fmt.Sprintf("%v_%v", height, i)
-				nodeInfo := matrix[key]
-				if nodeInfo.When == -1 {
-					nodeInfo.Candidate = true
-					nodeInfo.When = exec
-					//fmt.Println("\tmarcando ", key, " candidato ")
-				}
-			}
-		}
+		pNodes.MarkCandidate(&matrix[key].Node, metslo, exec, int(cWKL))
 	} else {
 		matrix[key].Reject = true
-		for height := cHeight; height >= 1; height-- {
-			for i := cWKL; i < int64(pNodes.lenWKL); i++ {
-				key := fmt.Sprintf("%v_%v", height, i)
-				nodeInfo := matrix[key]
-				if nodeInfo.When == -1 {
-					nodeInfo.Reject = true
-					nodeInfo.When = exec
-					//fmt.Println("\tmarcando ", key, " rejeitado ")
-				}
-			}
-		}
+		pNodes.MarkReject(&matrix[key].Node, metslo, exec, int(cWKL))
 	}
 	//fmt.Printf("FIM MARK\n")
 }
