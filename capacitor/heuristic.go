@@ -106,10 +106,10 @@ func PrintExecPath(winner ExecInfo, wkls []string, nodes Nodes) {
 	for _, key := range path {
 		s := strings.Split(key, "_")
 		if len(s) > 1 {
-			cHeight, _ := strconv.ParseInt(s[0], 0, 64)
+			node := nodes.NodeByID(s[0])
 			cWKL, _ := strconv.ParseInt(s[1], 0, 64)
-			str = fmt.Sprintf("%vWorkload:%v, Configs:%v\n", str, wkls[cWKL], nodes[cHeight-1].Configs)
-			execs = execs + len(nodes[cHeight-1].Configs)
+			str = fmt.Sprintf("%vWorkload:%v, Configs:%v\n", str, wkls[cWKL], node.Configs)
+			execs = execs + len(node.Configs)
 		}
 	}
 	str = fmt.Sprintf("%vTotal Execs:%v", str, execs)

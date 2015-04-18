@@ -223,6 +223,15 @@ func (nodes Nodes) String() string {
 	return str
 }
 
+func (nodes *Nodes) NodeByID(ID string) (node *Node) {
+	for _, node = range *nodes {
+		if ID == node.ID {
+			return
+		}
+	}
+	return nil
+}
+
 func printTree(mapa *map[string]Nodes) string {
 	str := ""
 	m := *mapa

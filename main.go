@@ -20,7 +20,7 @@ func init() {
 	flag.Float64Var(&price, "price", 7.0, "configuration max price")
 	flag.IntVar(&size, "size", 4, "max configuration size")
 	flag.IntVar(&routine, "routine", 1000, "goroutine max number")
-	flag.StringVar(&prop, "prop", "Mem", "[Mem,CPU,Price]")
+	flag.StringVar(&prop, "prop", "Mem", "[Mem,CPU,Price,Strict]")
 	flag.Float64Var(&slo, "slo", 20000, "SLO")
 }
 
