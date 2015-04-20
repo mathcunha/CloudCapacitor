@@ -137,20 +137,6 @@ func (pNodes *NodesInfo) Mark(key string, metslo bool, exec int) {
 	}
 	//fmt.Printf("FIM MARK\n")
 }
-func (node *NodeInfo) Equal(other *NodeInfo) bool {
-	return node.Height == other.Height && node.ID == other.ID && node.Exec == other.Exec && node.Reject == other.Reject && node.Candidate == other.Candidate && node.When == other.When
-}
-
-func (iNode *NodesInfo) Equal(other *NodesInfo) bool {
-	clone := *other
-	matrix := *iNode
-	for key, n := range matrix.matrix {
-		if !n.Equal(clone.matrix[key]) {
-			return false
-		}
-	}
-	return true
-}
 
 func (matrix NodesInfo) Clone() (clone *NodesInfo) {
 	mapa := make(map[string]*NodeInfo)
