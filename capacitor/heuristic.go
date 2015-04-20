@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/mathcunha/CloudCapacitor/sync2"
 	"log"
-	"strconv"
 	"strings"
 )
 
@@ -104,10 +103,9 @@ func PrintExecPath(winner ExecInfo, wkls []string, nodes Nodes) {
 	str := ""
 	execs := 0
 	for _, key := range path {
-		s := strings.Split(key, "_")
-		if len(s) > 1 {
-			node := nodes.NodeByID(s[0])
-			cWKL, _ := strconv.ParseInt(s[1], 0, 64)
+		ID, cWKL := splitMatrixKey(key)
+		if cWKL != -1 {
+			node := nodes.NodeByID(ID)
 			str = fmt.Sprintf("%vWorkload:%v, Configs:%v\n", str, wkls[cWKL], node.Configs)
 			execs = execs + len(node.Configs)
 		}

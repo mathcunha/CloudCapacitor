@@ -26,6 +26,21 @@ type NodeInfo struct {
 	When      int
 }
 
+func getMatrixKey(ID string, i int) (key string) {
+	key = fmt.Sprintf("%v#%v", ID, i)
+	return
+}
+
+func splitMatrixKey(key string) (ID string, i int) {
+	s := strings.Split(key, "#")
+	if len(s) > 1 {
+		wkl, _ := strconv.ParseInt(s[1], 0, 64)
+		return s[0], int(wkl)
+	} else {
+		return "", -1
+	}
+}
+
 func buildMatrix(wkls []string, nodes Nodes) (matrix NodesInfo) {
 	iNodes := NodesInfo{make(map[string]*NodeInfo), -1, -1}
 	max := -1
@@ -38,7 +53,7 @@ func buildMatrix(wkls []string, nodes Nodes) (matrix NodesInfo) {
 			n.Reject = false
 			n.Candidate = false
 			n.When = -1
-			iNodes.matrix[fmt.Sprintf("%v_%v", node.ID, i)] = n
+			iNodes.matrix[getMatrixKey(node.ID, i)] = n
 		}
 		max = node.Height
 	}
@@ -70,7 +85,7 @@ func (pNodes *NodesInfo) MarkCandidate(n *Node, metslo bool, exec int, cWKL int)
 		iNodes := *pNodes
 		matrix := iNodes.matrix
 		for i := cWKL; i >= 0; i-- {
-			key := fmt.Sprintf("%v_%v", n.ID, i)
+			key := getMatrixKey(n.ID, i)
 			nodeInfo := matrix[key]
 			if nodeInfo.When == -1 {
 				nodeInfo.Candidate = true
@@ -89,7 +104,7 @@ func (pNodes *NodesInfo) MarkReject(n *Node, metslo bool, exec int, cWKL int) {
 		iNodes := *pNodes
 		matrix := iNodes.matrix
 		for i := cWKL; i < pNodes.lenWKL; i++ {
-			key := fmt.Sprintf("%v_%v", n.ID, i)
+			key := getMatrixKey(n.ID, i)
 			nodeInfo := matrix[key]
 			if nodeInfo.When == -1 {
 				nodeInfo.Reject = true
@@ -104,8 +119,7 @@ func (pNodes *NodesInfo) MarkReject(n *Node, metslo bool, exec int, cWKL int) {
 }
 
 func (pNodes *NodesInfo) Mark(key string, metslo bool, exec int) {
-	s := strings.Split(key, "_")
-	cWKL, _ := strconv.ParseInt(s[1], 0, 64)
+	_, cWKL := splitMatrixKey(key)
 	//fmt.Printf("INI MARK\n")
 	//fmt.Printf("%v ? %v\n", key, metslo)
 	iNodes := *pNodes
@@ -116,10 +130,10 @@ func (pNodes *NodesInfo) Mark(key string, metslo bool, exec int) {
 
 	if metslo {
 		matrix[key].Candidate = true
-		pNodes.MarkCandidate(&matrix[key].Node, metslo, exec, int(cWKL))
+		pNodes.MarkCandidate(&matrix[key].Node, metslo, exec, cWKL)
 	} else {
 		matrix[key].Reject = true
-		pNodes.MarkReject(&matrix[key].Node, metslo, exec, int(cWKL))
+		pNodes.MarkReject(&matrix[key].Node, metslo, exec, cWKL)
 	}
 	//fmt.Printf("FIM MARK\n")
 }

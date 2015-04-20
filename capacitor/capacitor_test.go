@@ -1,7 +1,6 @@
 package capacitor
 
 import (
-	"log"
 	"testing"
 )
 
@@ -21,19 +20,19 @@ func TestMark(t *testing.T) {
 	M := *mapa
 
 	matrix := buildMatrix([]string{"100", "200", "300", "400", "500", "600", "700", "800", "900", "1000"}, M["c3"])
-	log.Println(M["c3"])
-	log.Println(matrix)
 
 	clone := matrix.Clone()
-	clone.Mark("3.75_2", true, 1)
-	clone.Mark("3.75_1", false, 2)
-	log.Println(clone)
+	clone.Mark("3.75#2", true, 1)
+	clone.Mark("3.75#1", false, 2)
+	if c.NodesLeft(clone) != 0 {
+		t.Fail()
+	}
 
 	matrix = buildMatrix([]string{"100", "200", "300", "400", "500", "600", "700", "800", "900", "1000"}, M["m3"])
 	clone = matrix.Clone()
-	log.Println(M["m3"])
-	log.Println(matrix)
-	clone.Mark("7.50_1", true, 1)
-	clone.Mark("7.50_1", false, 2)
-	log.Println(clone)
+	clone.Mark("7.50#1", true, 1)
+	clone.Mark("7.50#1", false, 2)
+	if clone.matrix["3.75#0"].When != -1 {
+		t.Fail()
+	}
 }
