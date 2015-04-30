@@ -78,6 +78,7 @@ func (dspace *DeploymentSpace) buildNodesStrict(prop string) *map[string]Nodes {
 
 	for cat, configs := range *dspace.configs {
 		nodes := make([]*Node, len(configs), len(configs))
+		//create each node
 		for i, c := range configs {
 			nodes[i] = new(Node)
 			nodes[i].ID = fmt.Sprintf("%v_%v", c.Size, c.Name)
@@ -87,6 +88,7 @@ func (dspace *DeploymentSpace) buildNodesStrict(prop string) *map[string]Nodes {
 			}
 			mapa[cat] = append(mapa[cat], nodes[i])
 		}
+		//link nodes with their highers and lowers
 		for _, out := range nodes {
 			for _, in := range nodes {
 				if out.Configs[0].Name == in.Configs[0].Name {
@@ -117,6 +119,36 @@ func (dspace *DeploymentSpace) buildNodesStrict(prop string) *map[string]Nodes {
 		}
 	}
 	return &mapa
+}
+
+func (n *Node) Equivalents() Nodes {
+	var nodes Nodes
+	for _, h := range n.Higher {
+		for _, c := range h.Lower {
+			if c.ID != n.ID {
+				nodes = append(nodes, c)
+			}
+		}
+	}
+	for _, e := range nodes {
+		for _, h := range e.Higher {
+			for _, c := range h.Lower {
+				if c.ID != n.ID && e.ID != n.ID {
+					has := false
+					for _, node := range nodes {
+						if node.ID == c.ID {
+							has = true
+						}
+					}
+					if !has {
+						nodes = append(nodes, c)
+					}
+				}
+			}
+
+		}
+	}
+	return nodes
 }
 
 func (dspace *DeploymentSpace) buildNodes(prop string) *map[string]Nodes {
