@@ -9,7 +9,7 @@ import (
 
 type Node struct {
 	ID     string
-	Height int
+	Level  int
 	Higher Nodes
 	Lower  Nodes
 	Configs
@@ -117,8 +117,19 @@ func (dspace *DeploymentSpace) buildNodesStrict(prop string) *map[string]Nodes {
 				}
 			}
 		}
+		//set levels
+		n := mapa[cat]
+		root := n.NodeByID(fmt.Sprintf("%v_%v", 1, configs[0].Name))
+		setLevels(root, 1)
 	}
 	return &mapa
+}
+
+func setLevels(n *Node, level int) {
+	n.Level = level
+	for _, l := range n.Lower {
+		setLevels(l, level+1)
+	}
 }
 
 func (n *Node) Equivalents() Nodes {
@@ -158,7 +169,7 @@ func (dspace *DeploymentSpace) buildNodes(prop string) *map[string]Nodes {
 		node := new(Node)
 		equal, ID := equalID(v[0], v[0])
 		node.ID = ID
-		node.Height = 0
+		node.Level = 0
 		for _, c := range configs {
 			equal, ID = equalID(v[0], reflect.ValueOf(c).MethodByName(prop).Call(nil)[0])
 			if equal {
@@ -189,12 +200,12 @@ func updateMap(mapa *map[string]Nodes, node *Node, cat string) {
 
 		nodes[max].Higher = Nodes{nodes[max-1]}
 		nodes[max-1].Lower = Nodes{nodes[max]}
-		nodes[max].Height = max + 1
+		nodes[max].Level = max + 1
 
 		m[cat] = nodes
 	} else {
 		node.Higher = nil
-		node.Height = 1
+		node.Level = 1
 
 		m[cat] = Nodes{node}
 	}
@@ -221,7 +232,7 @@ func (dspace DeploymentSpace) String() string {
 }
 
 func (n Node) String() string {
-	str := fmt.Sprintf("{ id:%v, height:%v", n.ID, n.Height)
+	str := fmt.Sprintf("{ id:%v, level:%v", n.ID, n.Level)
 	if n.Higher != nil {
 		str = fmt.Sprintf("%v, higher:", str)
 		for i, h := range n.Higher {
@@ -258,6 +269,15 @@ func (nodes Nodes) String() string {
 func (nodes *Nodes) NodeByID(ID string) (node *Node) {
 	for _, node = range *nodes {
 		if ID == node.ID {
+			return
+		}
+	}
+	return nil
+}
+
+func (nodes *Nodes) NodeByLevel(level int) (node *Node) {
+	for _, node = range *nodes {
+		if level == node.Level {
 			return
 		}
 	}

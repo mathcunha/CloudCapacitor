@@ -35,6 +35,16 @@ type ShortestPath struct {
 	maxIt int
 }
 
+//the policies proposed at thesis
+type Policy struct {
+	c     *Capacitor
+	label string
+}
+
+func NewPolicy(c *Capacitor, label string) (h *Policy) {
+	return &(Policy{c, label})
+}
+
 func NewShortestPath(c *Capacitor) (h *ShortestPath) {
 	h = new(ShortestPath)
 	h.c = c

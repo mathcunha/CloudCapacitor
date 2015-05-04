@@ -12,9 +12,9 @@ type Capacitor struct {
 }
 
 type NodesInfo struct {
-	matrix   map[string]*NodeInfo
-	lenWKL   int
-	lenNodes int
+	matrix    map[string]*NodeInfo
+	workloads int
+	levels    int
 }
 
 type NodeInfo struct {
@@ -46,19 +46,14 @@ func buildMatrix(wkls []string, nodes Nodes) (matrix NodesInfo) {
 	max := -1
 	for _, node := range nodes {
 		for i, wkl := range wkls {
-			n := new(NodeInfo)
-			n.Node = *node
-			n.WKL = wkl
-			n.Exec = false
-			n.Reject = false
-			n.Candidate = false
-			n.When = -1
-			iNodes.matrix[getMatrixKey(node.ID, i)] = n
+			iNodes.matrix[getMatrixKey(node.ID, i)] = &(NodeInfo{*node, wkl, false, false, false, -1})
 		}
-		max = node.Height
+		if max < node.Level {
+			max = node.Level
+		}
 	}
-	iNodes.lenWKL = len(wkls)
-	iNodes.lenNodes = max
+	iNodes.workloads = len(wkls)
+	iNodes.levels = max
 	return iNodes
 }
 
@@ -82,8 +77,7 @@ func (c *Capacitor) NodesLeft(nodes *NodesInfo) (count int) {
 
 func (pNodes *NodesInfo) MarkCandidate(n *Node, metslo bool, exec int, cWKL int) {
 	if n != nil {
-		iNodes := *pNodes
-		matrix := iNodes.matrix
+		matrix := (*pNodes).matrix
 		for i := cWKL; i >= 0; i-- {
 			key := getMatrixKey(n.ID, i)
 			nodeInfo := matrix[key]
@@ -101,9 +95,8 @@ func (pNodes *NodesInfo) MarkCandidate(n *Node, metslo bool, exec int, cWKL int)
 
 func (pNodes *NodesInfo) MarkReject(n *Node, metslo bool, exec int, cWKL int) {
 	if n != nil {
-		iNodes := *pNodes
-		matrix := iNodes.matrix
-		for i := cWKL; i < pNodes.lenWKL; i++ {
+		matrix := (*pNodes).matrix
+		for i := cWKL; i < pNodes.workloads; i++ {
 			key := getMatrixKey(n.ID, i)
 			nodeInfo := matrix[key]
 			if nodeInfo.When == -1 {
@@ -122,8 +115,7 @@ func (pNodes *NodesInfo) Mark(key string, metslo bool, exec int) {
 	_, cWKL := splitMatrixKey(key)
 	//fmt.Printf("INI MARK\n")
 	//fmt.Printf("%v ? %v\n", key, metslo)
-	iNodes := *pNodes
-	matrix := iNodes.matrix
+	matrix := (*pNodes).matrix
 
 	matrix[key].When = exec
 	matrix[key].Exec = true
@@ -141,21 +133,9 @@ func (pNodes *NodesInfo) Mark(key string, metslo bool, exec int) {
 func (matrix NodesInfo) Clone() (clone *NodesInfo) {
 	mapa := make(map[string]*NodeInfo)
 	for key, node := range matrix.matrix {
-		n := new(NodeInfo)
-		n.Node = node.Node
-		n.WKL = node.WKL
-		n.Exec = node.Exec
-		n.Reject = node.Reject
-		n.Candidate = node.Candidate
-		n.When = node.When
-
-		mapa[key] = n
+		mapa[key] = &(NodeInfo{node.Node, node.WKL, node.Exec, node.Reject, node.Candidate, node.When})
 	}
-	pClone := new(NodesInfo)
-	pClone.matrix = mapa
-	pClone.lenWKL = matrix.lenWKL
-	pClone.lenNodes = matrix.lenNodes
-	return pClone
+	return &(NodesInfo{mapa, matrix.workloads, matrix.levels})
 }
 
 func (node NodeInfo) String() (str string) {
@@ -163,7 +143,7 @@ func (node NodeInfo) String() (str string) {
 }
 
 func (nodes NodesInfo) String() (str string) {
-	str = fmt.Sprintf("{wkl:%v, heigh:%v, nodes:[\n\t", nodes.lenWKL, nodes.lenNodes)
+	str = fmt.Sprintf("{wkl:%v, heigh:%v, nodes:[\n\t", nodes.workloads, nodes.levels)
 	for key, n := range nodes.matrix {
 		str = fmt.Sprintf("%v[%v]%v\n\t", str, key, n)
 	}
