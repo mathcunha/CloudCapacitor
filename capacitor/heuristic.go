@@ -115,51 +115,32 @@ func PrintExecPath(winner ExecInfo, wkls []string, nodes Nodes) {
 }
 
 func (h *ShortestPath) findShortestPath(current []NodeExec, wg *sync2.BlockWaitGroup, chBest chan ExecInfo, numConfigs int) (nexts []NodeExec) {
-	novo := new([]NodeExec)
-	bingo := false
-	nexts = *novo
+	nexts = *(new([]NodeExec))
 	lessNodes := numConfigs
 	for _, ex := range current {
 		for key, node := range ex.nodes.matrix {
 			if !(node.When != -1) {
 				cNodes := ex.nodes.Clone()
 				nExecs := ex.execs
-				result := Result{}
+				var result Result
 				for _, conf := range node.Configs {
 					nExecs = nExecs + 1
-
 					result = h.c.Executor.Execute(*conf, node.WKL)
-
 					cNodes.Mark(key, result.SLO <= h.slo, nExecs)
 
 				}
 				nPath := fmt.Sprintf("%v%v->", ex.path, key)
-				//c.Exec(*cNodes, slo, nExecs, nPath, wg, ch, it+1, maxIts)
 
-				if h.c.HasMore(cNodes) {
-					if !bingo {
-						leftNodes := h.c.NodesLeft(cNodes)
-						if lessNodes == leftNodes {
-							nEx := new(NodeExec)
-							nEx.nodes = *cNodes
-							nEx.execs = nExecs
-							nEx.path = nPath
-							nEx.it = ex.it + 1
-							nexts = append(nexts, *nEx)
-						}
-						if lessNodes > leftNodes {
-							lessNodes = leftNodes
-							nEx := new(NodeExec)
-							nEx.nodes = *cNodes
-							nEx.execs = nExecs
-							nEx.path = nPath
-							nEx.it = ex.it + 1
-							nexts = []NodeExec{*nEx}
-						}
+				if nodesLeft := h.c.NodesLeft(cNodes); nodesLeft != 0 {
+					if lessNodes == nodesLeft {
+						nexts = append(nexts, NodeExec{*cNodes, ExecInfo{nExecs, nPath, ex.it + 1}})
+					}
+					if lessNodes > nodesLeft {
+						lessNodes = nodesLeft
+						nexts = []NodeExec{NodeExec{*cNodes, ExecInfo{nExecs, nPath, ex.it + 1}}}
 					}
 				} else {
 					//All executions!
-					bingo = true
 					wg.Add(1)
 					go func() {
 						defer wg.Done()
