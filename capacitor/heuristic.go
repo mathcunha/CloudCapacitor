@@ -73,6 +73,59 @@ func (h *ShortestPath) Exec(mode string, slo float32, wkls []string) {
 	}
 }
 
+func (h *Policy) Exec(mode string, slo float32, wkls []string) {
+	dspace := h.c.Dspace.CapacityBy(mode)
+
+	//map to store the results by category
+	dspaceInfo := make(map[string]NodesInfo)
+
+	//Categories array
+	cats := make([]string, 0, 5)
+
+	for cat, nodes := range *dspace {
+		cats = append(cats, cat)
+		dspaceInfo[cat] = buildMatrix(wkls, nodes)
+	}
+
+	cat := cats[0]
+	wkl := selectWorkload(false, dspace, "", cat)
+	level := selectCapacityLevel(false, dspace, "", cat)
+	nodes := (*dspace)[cat]
+
+	key := getMatrixKey(nodes.NodeByLevel(level).ID, wkl)
+	node := dspaceInfo[cat].matrix[key]
+
+	//initial execution
+	result := h.c.Executor.Execute(*node.Configs[0], node.WKL)
+	log.Printf("[Policy.Exec] Result :%v", result)
+
+	//if - select workload
+
+	//select category
+
+	//if - select capacity level
+
+	// execute
+	//mark
+	//execute the similars
+}
+
+func selectWorkload(metSLO bool, mapa *map[string]Nodes, key string, cat string) (wklID int) {
+	if "" == key {
+		return 0
+	}
+	//TODO
+	return -1
+}
+
+func selectCapacityLevel(metSLO bool, mapa *map[string]Nodes, key string, cat string) (level int) {
+	if "" == key {
+		return 1
+	}
+	//TODO
+	return -1
+}
+
 func (h *ShortestPath) ExecCategory(wkls []string, nodes Nodes) {
 	numConfigs := 0
 	for _, node := range nodes {
