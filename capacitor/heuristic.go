@@ -7,6 +7,12 @@ import (
 	"strings"
 )
 
+const (
+	Conservative = "conservative"
+	Pessimist    = "pessimist"
+	Optimist     = "optimist"
+)
+
 type ExecInfo struct {
 	execs int
 	path  string
@@ -37,12 +43,13 @@ type ShortestPath struct {
 
 //the policies proposed at thesis
 type Policy struct {
-	c     *Capacitor
-	label string
+	c           *Capacitor
+	levelPolicy string
+	wklPolicy   string
 }
 
-func NewPolicy(c *Capacitor, label string) (h *Policy) {
-	return &(Policy{c, label})
+func NewPolicy(c *Capacitor, levelPolicy string, wklPolicy string) (h *Policy) {
+	return &(Policy{c, levelPolicy, wklPolicy})
 }
 
 func NewShortestPath(c *Capacitor) (h *ShortestPath) {
@@ -76,41 +83,68 @@ func (h *ShortestPath) Exec(mode string, slo float32, wkls []string) {
 func (h *Policy) Exec(mode string, slo float32, wkls []string) {
 	dspace := h.c.Dspace.CapacityBy(mode)
 
+	execs := 0
+
 	//map to store the results by category
 	dspaceInfo := make(map[string]NodesInfo)
 
-	//Categories array
-	cats := make([]string, 0, 5)
-
 	for cat, nodes := range *dspace {
-		cats = append(cats, cat)
+		log.Printf("[Policy.Exec] Category:%v\n", cat)
 		dspaceInfo[cat] = buildMatrix(wkls, nodes)
+
+		wkl := h.selectWorkload(false, dspace, "", cat)
+		level := h.selectCapacityLevel(false, dspace, "", cat)
+		nodesInfo := dspaceInfo[cat]
+
+		key := getMatrixKey(nodes.NodeByLevel(level).ID, wkl)
+		nodeInfo := nodesInfo.matrix[key]
+
+		//Process main loop, basically there will be no blank space
+		for h.c.HasMore(&nodesInfo) {
+			result := h.c.Executor.Execute(*nodeInfo.Configs[0], nodeInfo.WKL)
+			log.Printf("[Policy.Exec] Node: %v - Result :%v\n", nodeInfo, result)
+			execs++
+			metSLO := result.SLO <= slo
+			(&nodesInfo).Mark(key, metSLO, execs)
+
+			log.Printf("[Policy.Exec] loop :%v\n", nodesInfo)
+			//execute all equivalents
+			equivalent := nodeInfo.Node.Equivalents()
+			for _, node := range equivalent {
+				key = getMatrixKey(node.ID, wkl)
+				nodeInfo = nodesInfo.matrix[key]
+				if !(nodeInfo.When != -1) {
+					result = h.c.Executor.Execute(*nodeInfo.Configs[0], nodeInfo.WKL)
+					log.Printf("[Policy.Exec] Node: %v - Result :%v\n", nodeInfo, result)
+					execs++
+					metSLO = result.SLO <= slo
+					(&nodesInfo).Mark(key, metSLO, execs)
+				}
+			}
+			//execute all equivalents
+			level = h.selectCapacityLevel(metSLO, dspace, key, cat)
+
+			//select workload
+			if level == -1 {
+				wkl = h.selectCapacityLevel(metSLO, dspace, key, cat)
+			}
+
+			//select other starting point
+
+			break
+		}
 	}
-
-	cat := cats[0]
-	wkl := selectWorkload(false, dspace, "", cat)
-	level := selectCapacityLevel(false, dspace, "", cat)
-	nodes := (*dspace)[cat]
-
-	key := getMatrixKey(nodes.NodeByLevel(level).ID, wkl)
-	node := dspaceInfo[cat].matrix[key]
-
-	//initial execution
-	result := h.c.Executor.Execute(*node.Configs[0], node.WKL)
-	log.Printf("[Policy.Exec] Result :%v", result)
-
-	//if - select workload
-
-	//select category
-
-	//if - select capacity level
-
-	// execute
-	//mark
-	//execute the similars
 }
 
-func selectWorkload(metSLO bool, mapa *map[string]Nodes, key string, cat string) (wklID int) {
+func HasMore(c *Capacitor, dspaceInfo map[string]NodesInfo) (hasMore bool) {
+	hasMore = true
+	for _, nodes := range dspaceInfo {
+		hasMore = c.HasMore(&nodes) || hasMore
+	}
+	return
+}
+
+func (p *Policy) selectWorkload(metSLO bool, mapa *map[string]Nodes, key string, cat string) (wklID int) {
 	if "" == key {
 		return 0
 	}
@@ -118,7 +152,7 @@ func selectWorkload(metSLO bool, mapa *map[string]Nodes, key string, cat string)
 	return -1
 }
 
-func selectCapacityLevel(metSLO bool, mapa *map[string]Nodes, key string, cat string) (level int) {
+func (p *Policy) selectCapacityLevel(metSLO bool, mapa *map[string]Nodes, key string, cat string) (level int) {
 	if "" == key {
 		return 1
 	}

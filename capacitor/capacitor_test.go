@@ -4,7 +4,32 @@ import (
 	"testing"
 )
 
-func TestMark(t *testing.T) {
+func TestMarkStrict(t *testing.T) {
+	vms, err := LoadTypes("/home/vagrant/go/src/github.com/mathcunha/CloudCapacitor/config/dspace.yml")
+	if err != nil {
+		t.Errorf("config error")
+	}
+	dspace := NewDeploymentSpace(&vms, 7.0, 4)
+	m := MockExecutor{"/home/vagrant/go/src/github.com/mathcunha/CloudCapacitor/config/wordpress_cpu_mem.csv", nil}
+	err = m.Load()
+	if err != nil {
+		t.Errorf("config error")
+	}
+	c := Capacitor{dspace, m}
+	mapa := c.Dspace.CapacityBy("Strict")
+	M := *mapa
+
+	matrix := buildMatrix([]string{"100", "200", "300", "400", "500", "600", "700", "800", "900", "1000"}, M["c3"])
+
+	clone := matrix.Clone()
+	clone.Mark("1_c3_large#0", true, 1)
+
+	if !clone.matrix["1_c3_2xlarge#0"].Candidate {
+		t.Fail()
+	}
+}
+
+func TestMarkMem(t *testing.T) {
 	vms, err := LoadTypes("/home/vagrant/go/src/github.com/mathcunha/CloudCapacitor/config/dspace.yml")
 	if err != nil {
 		t.Errorf("config error")

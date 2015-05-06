@@ -9,13 +9,13 @@ func TestHeuristic(t *testing.T) {
 	if err != nil {
 		t.Errorf("config error")
 	}
-	dspace := NewDeploymentSpace(&vms, 0.14, 2)
+	dspace := NewDeploymentSpace(&vms, 7.0, 4)
 	m := MockExecutor{"/home/vagrant/go/src/github.com/mathcunha/CloudCapacitor/config/wordpress_cpu_mem.csv", nil}
 	err = m.Load()
 	if err != nil {
 		t.Errorf("config error")
 	}
 	c := Capacitor{dspace, m}
-	h := NewPolicy(&c, "conservative")
+	h := NewPolicy(&c, Conservative, Conservative)
 	h.Exec("Strict", float32(20000), []string{"100", "200", "300", "400", "500", "600", "700", "800", "900", "1000"})
 }
