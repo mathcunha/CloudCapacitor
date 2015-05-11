@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"github.com/mathcunha/CloudCapacitor/sync2"
 	"log"
+	"sort"
 	"strings"
 )
 
 const (
 	Conservative = "conservative"
-	Pessimist    = "pessimist"
-	Optimist     = "optimist"
+	Pessimistic  = "pessimistic"
+	Optimistic   = "optimistic"
 )
 
 type ExecInfo struct {
@@ -92,9 +93,8 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) {
 		log.Printf("[Policy.Exec] Category:%v\n", cat)
 		dspaceInfo[cat] = buildMatrix(wkls, nodes)
 
-		wkl := h.selectWorkload(false, dspace, "", cat)
-		level := h.selectCapacityLevel(false, dspace, "", cat)
 		nodesInfo := dspaceInfo[cat]
+		level, wkl := h.selectStartingPoint(&nodesInfo, &nodes)
 
 		key := getMatrixKey(nodes.NodeByLevel(level).ID, wkl)
 		nodeInfo := nodesInfo.matrix[key]
@@ -121,15 +121,20 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) {
 					(&nodesInfo).Mark(key, metSLO, execs)
 				}
 			}
-			//execute all equivalents
-			level = h.selectCapacityLevel(metSLO, dspace, key, cat)
+			//select capacity level
+			oldLevel := level
+			level = h.selectCapacityLevel(&nodesInfo, key, &nodes)
 
 			//select workload
 			if level == -1 {
-				wkl = h.selectCapacityLevel(metSLO, dspace, key, cat)
+				level = oldLevel
+				wkl = h.selectWorkload(&nodesInfo, key)
 			}
 
 			//select other starting point
+			if wkl == -1 {
+				level, wkl = h.selectStartingPoint(&nodesInfo, &nodes)
+			}
 
 			break
 		}
@@ -144,20 +149,100 @@ func HasMore(c *Capacitor, dspaceInfo map[string]NodesInfo) (hasMore bool) {
 	return
 }
 
-func (p *Policy) selectWorkload(metSLO bool, mapa *map[string]Nodes, key string, cat string) (wklID int) {
-	if "" == key {
-		return 0
+func (p *Policy) selectStartingPoint(nodesInfo *NodesInfo, nodes *Nodes) (level int, wkl int) {
+	for level = 1; level <= nodesInfo.levels; level++ {
+		for wkl = 0; wkl < nodesInfo.workloads; wkl++ {
+			nodeInfo := nodesInfo.matrix[getMatrixKey(nodes.NodeByLevel(level).ID, wkl)]
+			if nodeInfo.When == -1 {
+				return
+			} else {
+				//Same height, but, possibly, different lowers and highers
+				equivalents := nodeInfo.Node.Equivalents()
+				for _, node := range equivalents {
+					nodeInfo := nodesInfo.matrix[getMatrixKey(node.ID, wkl)]
+					if nodeInfo.When == -1 {
+						return
+					}
+				}
+			}
+		}
 	}
-	//TODO
-	return -1
+	return
 }
 
-func (p *Policy) selectCapacityLevel(metSLO bool, mapa *map[string]Nodes, key string, cat string) (level int) {
-	if "" == key {
-		return 1
+func (p *Policy) selectWorkload(nodesInfo *NodesInfo, key string) (wklID int) {
+	_, wkls := p.buildWorkloadList(key, nodesInfo)
+	wklID = -1
+	if len(wkls) == 0 {
+		return
 	}
-	//TODO
-	return -1
+
+	switch p.wklPolicy {
+	case Conservative:
+		wklID = wkls[len(wkls)/2]
+	case Pessimistic:
+		wklID = wkls[0]
+	case Optimistic:
+		wklID = wkls[len(wkls)-1]
+	}
+	return
+}
+
+func (p *Policy) selectCapacityLevel(nodesInfo *NodesInfo, key string, nodes *Nodes) (level int) {
+	_, levels := p.buildCapacityLevelList(key, nodesInfo, nodes)
+	level = -1
+	if len(levels) == 0 {
+		return
+	}
+
+	switch p.levelPolicy {
+	case Conservative:
+		level = levels[len(levels)/2]
+	case Pessimistic:
+		level = levels[0]
+	case Optimistic:
+		level = levels[len(levels)-1]
+
+	}
+	return
+}
+
+//Workloads availables in the current capacity level
+func (p *Policy) buildWorkloadList(key string, nodesInfo *NodesInfo) (wkl int, wkls []int) {
+	wkls = make([]int, 0, nodesInfo.workloads)
+	ID, wkl := splitMatrixKey(key)
+	for i := 0; i < nodesInfo.workloads; i++ {
+		nodeInfo := nodesInfo.matrix[getMatrixKey(ID, i)]
+		if nodeInfo.When == -1 {
+			wkls = append(wkls, i)
+		}
+	}
+	sort.Ints(wkls)
+	return
+}
+
+//capacity levels availables in the current workload
+func (p *Policy) buildCapacityLevelList(key string, nodesInfo *NodesInfo, nodes *Nodes) (ID string, levels []int) {
+	levels = make([]int, 0, nodesInfo.levels)
+	ID, wkl := splitMatrixKey(key)
+	for i := 1; i <= nodesInfo.levels; i++ {
+		nodeInfo := nodesInfo.matrix[getMatrixKey(nodes.NodeByLevel(i).ID, wkl)]
+		if nodeInfo.When == -1 {
+			levels = append(levels, i)
+		} else {
+			//Same height, but, possibly, different lowers and highers
+			equivalents := nodeInfo.Node.Equivalents()
+			for _, node := range equivalents {
+				nodeInfo := nodesInfo.matrix[getMatrixKey(node.ID, wkl)]
+				if nodeInfo.When == -1 {
+					levels = append(levels, i)
+					break
+				}
+			}
+		}
+	}
+	sort.Ints(levels)
+	return
 }
 
 func (h *ShortestPath) ExecCategory(wkls []string, nodes Nodes) {
