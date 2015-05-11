@@ -90,35 +90,37 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) {
 	dspaceInfo := make(map[string]NodesInfo)
 
 	for cat, nodes := range *dspace {
-		log.Printf("[Policy.Exec] Category:%v\n", cat)
 		dspaceInfo[cat] = buildMatrix(wkls, nodes)
 
 		nodesInfo := dspaceInfo[cat]
-		level, wkl := h.selectStartingPoint(&nodesInfo, &nodes)
 
+		level, wkl := h.selectStartingPoint(&nodesInfo, &nodes)
 		key := getMatrixKey(nodes.NodeByLevel(level).ID, wkl)
+
+		level = h.selectCapacityLevel(&nodesInfo, key, &nodes)
+		wkl = h.selectWorkload(&nodesInfo, key)
+		key = getMatrixKey(nodes.NodeByLevel(level).ID, wkl)
 		nodeInfo := nodesInfo.matrix[key]
 
 		//Process main loop, basically there will be no blank space
 		for h.c.HasMore(&nodesInfo) {
-			result := h.c.Executor.Execute(*nodeInfo.Configs[0], nodeInfo.WKL)
-			log.Printf("[Policy.Exec] Node: %v - Result :%v\n", nodeInfo, result)
-			execs++
-			metSLO := result.SLO <= slo
-			(&nodesInfo).Mark(key, metSLO, execs)
+			if !(nodeInfo.When != -1) {
+				result := h.c.Executor.Execute(*nodeInfo.Configs[0], nodeInfo.WKL)
+				log.Printf("[Policy.Exec] WKL:%v Result:%v\n", wkls[wkl], result)
+				execs++
+				(&nodesInfo).Mark(key, result.SLO <= slo, execs)
+			}
 
-			log.Printf("[Policy.Exec] loop :%v\n", nodesInfo)
 			//execute all equivalents
-			equivalent := nodeInfo.Node.Equivalents()
+			equivalent := nodes.Equivalents((&nodeInfo.Node))
 			for _, node := range equivalent {
 				key = getMatrixKey(node.ID, wkl)
 				nodeInfo = nodesInfo.matrix[key]
 				if !(nodeInfo.When != -1) {
-					result = h.c.Executor.Execute(*nodeInfo.Configs[0], nodeInfo.WKL)
-					log.Printf("[Policy.Exec] Node: %v - Result :%v\n", nodeInfo, result)
+					result := h.c.Executor.Execute(*nodeInfo.Configs[0], nodeInfo.WKL)
+					log.Printf("[Policy.Exec] WKL:%v Result:%v\n", wkls[wkl], result)
 					execs++
-					metSLO = result.SLO <= slo
-					(&nodesInfo).Mark(key, metSLO, execs)
+					(&nodesInfo).Mark(key, result.SLO <= slo, execs)
 				}
 			}
 			//select capacity level
@@ -134,10 +136,23 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) {
 			//select other starting point
 			if wkl == -1 {
 				level, wkl = h.selectStartingPoint(&nodesInfo, &nodes)
+				if wkl != -1 && level != -1 {
+					localKey := getMatrixKey(nodes.NodeByLevel(level).ID, wkl)
+					level = h.selectCapacityLevel(&nodesInfo, localKey, &nodes)
+					wkl = h.selectWorkload(&nodesInfo, localKey)
+				} else if h.c.HasMore(&nodesInfo) {
+					log.Fatalf("[Policy.Exec] Starting Point \n:%v\n%v", nodesInfo, nodes)
+					break
+				}
 			}
 
-			break
+			//next config
+			if wkl != -1 && level != -1 {
+				key = getMatrixKey(nodes.NodeByLevel(level).ID, wkl)
+				nodeInfo = nodesInfo.matrix[key]
+			}
 		}
+		log.Printf("[Policy.Exec] Category:%v Execs:%v", cat, execs)
 	}
 }
 
@@ -157,7 +172,7 @@ func (p *Policy) selectStartingPoint(nodesInfo *NodesInfo, nodes *Nodes) (level 
 				return
 			} else {
 				//Same height, but, possibly, different lowers and highers
-				equivalents := nodeInfo.Node.Equivalents()
+				equivalents := nodes.Equivalents((&nodeInfo.Node))
 				for _, node := range equivalents {
 					nodeInfo := nodesInfo.matrix[getMatrixKey(node.ID, wkl)]
 					if nodeInfo.When == -1 {
@@ -167,7 +182,7 @@ func (p *Policy) selectStartingPoint(nodesInfo *NodesInfo, nodes *Nodes) (level 
 			}
 		}
 	}
-	return
+	return -1, -1
 }
 
 func (p *Policy) selectWorkload(nodesInfo *NodesInfo, key string) (wklID int) {
@@ -231,7 +246,7 @@ func (p *Policy) buildCapacityLevelList(key string, nodesInfo *NodesInfo, nodes 
 			levels = append(levels, i)
 		} else {
 			//Same height, but, possibly, different lowers and highers
-			equivalents := nodeInfo.Node.Equivalents()
+			equivalents := nodes.Equivalents((&nodeInfo.Node))
 			for _, node := range equivalents {
 				nodeInfo := nodesInfo.matrix[getMatrixKey(node.ID, wkl)]
 				if nodeInfo.When == -1 {

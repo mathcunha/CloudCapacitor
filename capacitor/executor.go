@@ -9,7 +9,6 @@ import (
 )
 
 type Result struct {
-	Height int
 	Config Configuration
 	Performance
 }
@@ -76,4 +75,14 @@ func (e MockExecutor) Execute(config Configuration, wkl string) (result Result) 
 	}
 
 	return *r
+}
+
+func (result Result) String() (str string) {
+	str = fmt.Sprintf("{Config:%v, Performance:%v}", result.Config, result.Performance)
+	return
+}
+
+func (perf Performance) String() (str string) {
+	str = fmt.Sprintf("{mem:%v, cpu:%v, slo:%v}", perf.Mem, perf.CPU, perf.SLO)
+	return
 }

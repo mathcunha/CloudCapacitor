@@ -26,29 +26,41 @@ func TestCapacityStrict(t *testing.T) {
 	mapa := dspace.CapacityBy("Strict")
 	t.Logf("configs generated %v", dspace)
 	t.Logf("mapa by Strict :%v", printTree(mapa))
+	nodes := (*mapa)["c3"]
 
-	for _, n := range (*mapa)["c3"] {
+	for _, n := range nodes {
 		if n.ID == "3_c3_large" {
 			t.Logf("\n %v equivalents", n.ID)
-			for _, e := range n.Equivalents() {
+			for _, e := range nodes.Equivalents(n) {
 				t.Logf("%v,", e.ID)
 			}
 			t.Log("\n")
 		}
 		if n.ID == "2_c3_xlarge" {
 			t.Logf("\n %v equivalents", n.ID)
-			for _, e := range n.Equivalents() {
+			for _, e := range nodes.Equivalents(n) {
 				t.Logf("%v,", e.ID)
 			}
 			t.Log("\n")
 		}
 		if n.ID == "2_c3_2xlarge" {
 			t.Logf("\n %v equivalents", n.ID)
-			for _, e := range n.Equivalents() {
+			for _, e := range nodes.Equivalents(n) {
 				t.Logf("%v,", e.ID)
 			}
 			t.Log("\n")
 		}
 
+	}
+
+	nodes = (*mapa)["m3"]
+	for _, n := range nodes {
+		if n.ID == "4_m3_medium" {
+			t.Logf("\n %v equivalents", n.ID)
+			for _, e := range nodes.Equivalents(n) {
+				t.Logf("%v,", e.ID)
+			}
+			t.Log("\n")
+		}
 	}
 }

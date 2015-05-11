@@ -132,34 +132,14 @@ func setLevels(n *Node, level int) {
 	}
 }
 
-func (n *Node) Equivalents() Nodes {
-	var nodes Nodes
-	for _, h := range n.Higher {
-		for _, c := range h.Lower {
-			if c.ID != n.ID {
-				nodes = append(nodes, c)
-			}
+func (nodes *Nodes) Equivalents(n *Node) Nodes {
+	var equivalents Nodes
+	for _, e := range *nodes {
+		if n.ID != e.ID && n.Level == e.Level {
+			equivalents = append(equivalents, e)
 		}
 	}
-	for _, e := range nodes {
-		for _, h := range e.Higher {
-			for _, c := range h.Lower {
-				if c.ID != n.ID && e.ID != n.ID {
-					has := false
-					for _, node := range nodes {
-						if node.ID == c.ID {
-							has = true
-						}
-					}
-					if !has {
-						nodes = append(nodes, c)
-					}
-				}
-			}
-
-		}
-	}
-	return nodes
+	return equivalents
 }
 
 func (dspace *DeploymentSpace) buildNodes(prop string) *map[string]Nodes {
