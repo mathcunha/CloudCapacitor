@@ -98,11 +98,10 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo) {
 
 		nodesInfo := dspaceInfo[cat]
 
-		level, wkl := h.selectStartingPoint(&nodesInfo, &nodes)
-		key := getMatrixKey(nodes.NodeByLevel(level).ID, wkl)
+		key := h.selectStartingPoint(&nodesInfo, &nodes)
 
-		level = h.selectCapacityLevel(&nodesInfo, key, &nodes)
-		wkl = h.selectWorkload(&nodesInfo, key)
+		level := h.selectCapacityLevel(&nodesInfo, key, &nodes)
+		wkl := h.selectWorkload(&nodesInfo, key)
 		key = getMatrixKey(nodes.NodeByLevel(level).ID, wkl)
 		nodeInfo := nodesInfo.matrix[key]
 
@@ -121,10 +120,6 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo) {
 			for _, node := range equivalent {
 				key = getMatrixKey(node.ID, wkl)
 				nodeInfo = nodesInfo.matrix[key]
-				if nodeInfo == nil {
-					log.Printf("ERROR: [Policy.Exec] %v", key)
-					return execInfo
-				}
 				if !(nodeInfo.When != -1) {
 					result := h.c.Executor.Execute(*nodeInfo.Configs[0], nodeInfo.WKL)
 					//log.Printf("[Policy.Exec] WKL:%v Result:%v\n", wkls[wkl], result)
@@ -145,21 +140,19 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo) {
 
 			//select other starting point
 			if wkl == -1 {
-				level, wkl = h.selectStartingPoint(&nodesInfo, &nodes)
-				if wkl != -1 && level != -1 {
-					localKey := getMatrixKey(nodes.NodeByLevel(level).ID, wkl)
+				localKey := h.selectStartingPoint(&nodesInfo, &nodes)
+				if localKey != "" {
 					level = h.selectCapacityLevel(&nodesInfo, localKey, &nodes)
 					wkl = h.selectWorkload(&nodesInfo, localKey)
 				} else if h.c.HasMore(&nodesInfo) {
 					log.Fatalf("[Policy.Exec] Starting Point \n:%v\n%v", nodesInfo, nodes)
+					break
 				}
 			}
 
 			//next config
-			if wkl != -1 && level != -1 {
-				key = getMatrixKey(nodes.NodeByLevel(level).ID, wkl)
-				nodeInfo = nodesInfo.matrix[key]
-			}
+			key = getMatrixKey(nodes.NodeByLevel(level).ID, wkl)
+			nodeInfo = nodesInfo.matrix[key]
 		}
 		//log.Printf("[Policy.Exec] Category:%v Execs:%v", cat, execInfo.execs)
 	}
@@ -175,17 +168,19 @@ func HasMore(c *Capacitor, dspaceInfo map[string]NodesInfo) (hasMore bool) {
 	return
 }
 
-func (p *Policy) selectStartingPoint(nodesInfo *NodesInfo, nodes *Nodes) (level int, wkl int) {
-	for level = 1; level <= nodesInfo.levels; level++ {
-		for wkl = 0; wkl < nodesInfo.workloads; wkl++ {
-			nodeInfo := nodesInfo.matrix[getMatrixKey(nodes.NodeByLevel(level).ID, wkl)]
+func (p *Policy) selectStartingPoint(nodesInfo *NodesInfo, nodes *Nodes) (key string) {
+	for level := 1; level <= nodesInfo.levels; level++ {
+		for wkl := 0; wkl < nodesInfo.workloads; wkl++ {
+			key = getMatrixKey(nodes.NodeByLevel(level).ID, wkl)
+			nodeInfo := nodesInfo.matrix[key]
 			if nodeInfo.When == -1 {
 				return
 			} else {
-				//Same height, but, possibly, different lowers and highers
+				//Same level, but, possibly, different lowers and highers
 				equivalents := nodes.Equivalents((&nodeInfo.Node))
 				for _, node := range equivalents {
-					nodeInfo := nodesInfo.matrix[getMatrixKey(node.ID, wkl)]
+					key = getMatrixKey(node.ID, wkl)
+					nodeInfo := nodesInfo.matrix[key]
 					if nodeInfo.When == -1 {
 						return
 					}
@@ -193,7 +188,7 @@ func (p *Policy) selectStartingPoint(nodesInfo *NodesInfo, nodes *Nodes) (level 
 			}
 		}
 	}
-	return -1, -1
+	return ""
 }
 
 func (p *Policy) selectWorkload(nodesInfo *NodesInfo, key string) (wklID int) {
@@ -256,7 +251,7 @@ func (p *Policy) buildCapacityLevelList(key string, nodesInfo *NodesInfo, nodes 
 		if nodeInfo.When == -1 {
 			levels = append(levels, i)
 		} else {
-			//Same height, but, possibly, different lowers and highers
+			//Same level, but, possibly, different lowers and highers
 			equivalents := nodes.Equivalents((&nodeInfo.Node))
 			for _, node := range equivalents {
 				nodeInfo := nodesInfo.matrix[getMatrixKey(node.ID, wkl)]
