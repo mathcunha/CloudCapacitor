@@ -26,7 +26,7 @@ type NodeExec struct {
 }
 
 type Heuristic interface {
-	Exec(mode string, slo float32, wkls []string)
+	Exec(mode string, slo float32, wkls []string) ExecInfo
 }
 
 //Execute all configurations and workloads without infer
@@ -59,7 +59,7 @@ func NewShortestPath(c *Capacitor) (h *ShortestPath) {
 	return
 }
 
-func (bf *BrutalForce) Exec(mode string, slo float32, wkls []string) {
+func (bf *BrutalForce) Exec(mode string, slo float32, wkls []string) (path ExecInfo) {
 	mapa := bf.c.Dspace.CapacityBy(mode)
 	for _, nodes := range *mapa {
 		for _, node := range nodes {
@@ -71,20 +71,24 @@ func (bf *BrutalForce) Exec(mode string, slo float32, wkls []string) {
 			}
 		}
 	}
+	//TODO
+	return ExecInfo{0, "", 0}
 }
 
-func (h *ShortestPath) Exec(mode string, slo float32, wkls []string) {
+func (h *ShortestPath) Exec(mode string, slo float32, wkls []string) (path ExecInfo) {
 	mapa := h.c.Dspace.CapacityBy(mode)
 	h.slo = slo
 	for _, nodes := range *mapa {
 		h.ExecCategory(wkls, nodes)
 	}
+	//TODO
+	return ExecInfo{0, "", 0}
 }
 
-func (h *Policy) Exec(mode string, slo float32, wkls []string) {
+func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo) {
 	dspace := h.c.Dspace.CapacityBy(mode)
 
-	execs := 0
+	execInfo := ExecInfo{0, "", 0}
 
 	//map to store the results by category
 	dspaceInfo := make(map[string]NodesInfo)
@@ -106,9 +110,10 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) {
 		for h.c.HasMore(&nodesInfo) {
 			if !(nodeInfo.When != -1) {
 				result := h.c.Executor.Execute(*nodeInfo.Configs[0], nodeInfo.WKL)
-				log.Printf("[Policy.Exec] WKL:%v Result:%v\n", wkls[wkl], result)
-				execs++
-				(&nodesInfo).Mark(key, result.SLO <= slo, execs)
+				//log.Printf("[Policy.Exec] WKL:%v Result:%v\n", wkls[wkl], result)
+				execInfo.path = fmt.Sprintf("%v%v->", execInfo.path, key)
+				execInfo.execs++
+				(&nodesInfo).Mark(key, result.SLO <= slo, execInfo.execs)
 			}
 
 			//execute all equivalents
@@ -116,11 +121,16 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) {
 			for _, node := range equivalent {
 				key = getMatrixKey(node.ID, wkl)
 				nodeInfo = nodesInfo.matrix[key]
+				if nodeInfo == nil {
+					log.Printf("ERROR: [Policy.Exec] %v", key)
+					return execInfo
+				}
 				if !(nodeInfo.When != -1) {
 					result := h.c.Executor.Execute(*nodeInfo.Configs[0], nodeInfo.WKL)
-					log.Printf("[Policy.Exec] WKL:%v Result:%v\n", wkls[wkl], result)
-					execs++
-					(&nodesInfo).Mark(key, result.SLO <= slo, execs)
+					//log.Printf("[Policy.Exec] WKL:%v Result:%v\n", wkls[wkl], result)
+					execInfo.path = fmt.Sprintf("%v%v->", execInfo.path, key)
+					execInfo.execs++
+					(&nodesInfo).Mark(key, result.SLO <= slo, execInfo.execs)
 				}
 			}
 			//select capacity level
@@ -142,7 +152,6 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) {
 					wkl = h.selectWorkload(&nodesInfo, localKey)
 				} else if h.c.HasMore(&nodesInfo) {
 					log.Fatalf("[Policy.Exec] Starting Point \n:%v\n%v", nodesInfo, nodes)
-					break
 				}
 			}
 
@@ -152,8 +161,10 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) {
 				nodeInfo = nodesInfo.matrix[key]
 			}
 		}
-		log.Printf("[Policy.Exec] Category:%v Execs:%v", cat, execs)
+		//log.Printf("[Policy.Exec] Category:%v Execs:%v", cat, execInfo.execs)
 	}
+
+	return execInfo
 }
 
 func HasMore(c *Capacitor, dspaceInfo map[string]NodesInfo) (hasMore bool) {
@@ -213,9 +224,9 @@ func (p *Policy) selectCapacityLevel(nodesInfo *NodesInfo, key string, nodes *No
 	switch p.levelPolicy {
 	case Conservative:
 		level = levels[len(levels)/2]
-	case Pessimistic:
-		level = levels[0]
 	case Optimistic:
+		level = levels[0]
+	case Pessimistic:
 		level = levels[len(levels)-1]
 
 	}
@@ -303,7 +314,7 @@ func PrintExecPath(winner ExecInfo, wkls []string, nodes Nodes) {
 		ID, cWKL := splitMatrixKey(key)
 		if cWKL != -1 {
 			node := nodes.NodeByID(ID)
-			str = fmt.Sprintf("%vWorkload:%v, Configs:%v\n", str, wkls[cWKL], node.Configs)
+			str = fmt.Sprintf("%v{Workload:%v, Level:%v, Configs:%v}\n", str, wkls[cWKL], node.Level, node.Configs)
 			execs = execs + len(node.Configs)
 		}
 	}
