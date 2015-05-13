@@ -91,7 +91,9 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 	execInfo := h.Exec(config.Mode, float32(config.Slo), wkls)
 
 	str := GetExecPath(execInfo, wkls, config.Mode, &c)
-	log.Printf("%v", str)
+
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprintf(w, "%v", str)
 }
 
 func GetExecPath(winner capacitor.ExecInfo, wkls []string, mode string, c *capacitor.Capacitor) (str string) {
@@ -108,7 +110,7 @@ func GetExecPath(winner capacitor.ExecInfo, wkls []string, mode string, c *capac
 		ID, cWKL := capacitor.SplitMatrixKey(key)
 		if cWKL != -1 {
 			node := nodes.NodeByID(ID)
-			str = fmt.Sprintf("%v{\"key\":%v, \"workload\":%v, \"level\":%v, \"config\":%v},", str, key, wkls[cWKL], node.Level, node.Configs[0])
+			str = fmt.Sprintf("%v{\"key\":\"%v\", \"workload\":%v, \"level\":%v,  \"name\":\"%v\", \"price\":%v, \"size\":%v},", str, key, wkls[cWKL], node.Level, node.Configs[0].Name, node.Configs[0].Price(), node.Configs[0].Size)
 		}
 	}
 	//one extra comma
