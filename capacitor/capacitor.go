@@ -26,12 +26,12 @@ type NodeInfo struct {
 	When      int
 }
 
-func getMatrixKey(ID string, i int) (key string) {
+func GetMatrixKey(ID string, i int) (key string) {
 	key = fmt.Sprintf("%v#%v", ID, i)
 	return
 }
 
-func splitMatrixKey(key string) (ID string, i int) {
+func SplitMatrixKey(key string) (ID string, i int) {
 	s := strings.Split(key, "#")
 	if len(s) > 1 {
 		wkl, _ := strconv.ParseInt(s[1], 0, 64)
@@ -46,7 +46,7 @@ func buildMatrix(wkls []string, nodes Nodes) (matrix NodesInfo) {
 	max := -1
 	for _, node := range nodes {
 		for i, wkl := range wkls {
-			iNodes.matrix[getMatrixKey(node.ID, i)] = &(NodeInfo{*node, wkl, false, false, false, -1})
+			iNodes.matrix[GetMatrixKey(node.ID, i)] = &(NodeInfo{*node, wkl, false, false, false, -1})
 		}
 		if max < node.Level {
 			max = node.Level
@@ -79,7 +79,7 @@ func (pNodes *NodesInfo) MarkCandidate(n *Node, metslo bool, exec int, cWKL int)
 	if n != nil {
 		matrix := (*pNodes).matrix
 		for i := cWKL; i >= 0; i-- {
-			key := getMatrixKey(n.ID, i)
+			key := GetMatrixKey(n.ID, i)
 			nodeInfo := matrix[key]
 			if nodeInfo.When == -1 {
 				nodeInfo.Candidate = true
@@ -97,7 +97,7 @@ func (pNodes *NodesInfo) MarkReject(n *Node, metslo bool, exec int, cWKL int) {
 	if n != nil {
 		matrix := (*pNodes).matrix
 		for i := cWKL; i < pNodes.workloads; i++ {
-			key := getMatrixKey(n.ID, i)
+			key := GetMatrixKey(n.ID, i)
 			nodeInfo := matrix[key]
 			if nodeInfo.When == -1 {
 				nodeInfo.Reject = true
@@ -112,7 +112,7 @@ func (pNodes *NodesInfo) MarkReject(n *Node, metslo bool, exec int, cWKL int) {
 }
 
 func (pNodes *NodesInfo) Mark(key string, metslo bool, exec int) {
-	_, cWKL := splitMatrixKey(key)
+	_, cWKL := SplitMatrixKey(key)
 	//fmt.Printf("INI MARK\n")
 	//fmt.Printf("%v ? %v\n", key, metslo)
 	matrix := (*pNodes).matrix

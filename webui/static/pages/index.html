@@ -275,7 +275,7 @@
 							</div>
 							<div class="form-group">
 							  <select class="form-control" id="mode">
-								<option value="capacity">capacity</option>
+								<option value="Strict">capacity</option>
 								<option value="cost">cost</option>
 								<option value="mem">mem</option>
 								<option value="cpu">cpu</option>
@@ -506,14 +506,15 @@
 
 	$("#button_execute").click( 
 		function(){
-			data = "{slo:" + $( "#slo" ).val() 
-			data = data + ', mode="'+$( "#mode" ).val()+'"'
-			data = data + ", category:"+$( 'input[name=category]:checked' ).val()
-			data = data + ", demand:["+$( '#demand' ).val()+"]"
-			data = data + ', wkl="'+$( "#workload_approach" ).val()+'"'
-			data = data + ', configuration="'+$( "#configuration_approach" ).val()+'"}'
+			data = '{"slo":' + $( "#slo" ).val() 
+			data = data + ', "mode":"'+$( "#mode" ).val()+'"'
+			data = data + ', "category":'+$( 'input[name=category]:checked' ).val()
+			data = data + ', "demand":['+$( '#demand' ).val()+']'
+			data = data + ', "wkl":"'+$( "#workload_approach" ).val()+'"'
+			data = data + ', "configuration":"'+$( "#configuration_approach" ).val()+'"}'
 			
 			alert(data)
+			$.post( "/api/v1/capacitor/", data );
 		 }
 	);
     </script>
