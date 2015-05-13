@@ -48,6 +48,7 @@
                     <span class="icon-bar"></span>
                     <span class="icon-bar"></span>
                 </button>
+		<a class="navbar-brand" href="index.html"><img alt="Cloud Capacitor logo" height="35" src="../img/cloud-capacitor-logo.png" width="55" /></a>
                 <a class="navbar-brand" href="index.html">Cloud Capacitor</a>
             </div>
             <!-- /.navbar-header -->
@@ -349,7 +350,7 @@
                                     <i class="fa fa-tachometer fa-5x"></i>
                                 </div>
                                 <div class="col-xs-9 text-right">
-                                    <div class="huge">26</div>
+                                    <div class="huge" id="totalExecs">0</div>
                                     <div>Total Executions!</div>
                                 </div>
                             </div>
@@ -364,7 +365,7 @@
                                     <i class="fa fa-money fa-5x"></i>
                                 </div>
                                 <div class="col-xs-9 text-right">
-                                    <div class="huge">12</div>
+                                    <div class="huge" id="totalPrice">0.00</div>
                                     <div>Execution Cost!</div>
                                 </div>
                             </div>
@@ -379,7 +380,7 @@
                                     <i class="fa fa-bullseye fa-5x"></i>
                                 </div>
                                 <div class="col-xs-9 text-right">
-                                    <div class="huge">124</div>
+                                    <div class="huge" id="fMeasure"></div>
                                     <div>F-Measure!</div>
                                 </div>
                             </div>
@@ -444,37 +445,7 @@
                         </div>
                         <!-- /.panel-heading -->
                         <div class="panel-body">
-                            <div class="list-group">
-                                <a href="#" class="list-group-item">
-                                    <i class="fa fa-cloud fa-fw"></i> m3_2xlarge 
-									<i class="fa fa-gears fa-fw"></i> 2
-                                    <span class="pull-right text-muted small"><i class="fa fa-users fa-fw"></i><em>100 users</em></span>
-                                </a>
-                                <a href="#" class="list-group-item">
-                                    <i class="fa fa-cloud fa-fw"></i> m3_2xlarge 
-									<i class="fa fa-gears fa-fw"></i> 1
-                                    <span class="pull-right text-muted small"><i class="fa fa-users fa-fw"></i><em>100 users</em></span>
-                                </a>
-								<a href="#" class="list-group-item">
-                                    <i class="fa fa-cloud fa-fw"></i> m3_2xlarge 
-									<i class="fa fa-gears fa-fw"></i> 4
-                                    <span class="pull-right text-muted small"><i class="fa fa-users fa-fw"></i><em>300 users</em></span>
-                                </a>
-								<a href="#" class="list-group-item">
-                                    <i class="fa fa-cloud fa-fw"></i> m3_2xlarge 
-									<i class="fa fa-gears fa-fw"></i> 3
-                                    <span class="pull-right text-muted small"><i class="fa fa-users fa-fw"></i><em>100 users</em></span>
-                                </a>
-								<a href="#" class="list-group-item">
-                                    <i class="fa fa-cloud fa-fw"></i> m3_xlarge 
-									<i class="fa fa-gears fa-fw"></i> 2
-                                    <span class="pull-right text-muted small"><i class="fa fa-users fa-fw"></i><em>500 users</em></span>
-                                </a>
-								<a href="#" class="list-group-item">
-                                    <i class="fa fa-cloud fa-fw"></i> m3_large 
-									<i class="fa fa-gears fa-fw"></i> 2
-                                    <span class="pull-right text-muted small"><i class="fa fa-users fa-fw"></i><em>100 users</em></span>
-                                </a>
+                            <div class="list-group" id="panelExecPath">
                             </div>
                             <!-- /.list-group -->
                         </div>
@@ -512,9 +483,24 @@
 			data = data + ', "demand":['+$( '#demand' ).val()+']'
 			data = data + ', "wkl":"'+$( "#workload_approach" ).val()+'"'
 			data = data + ', "configuration":"'+$( "#configuration_approach" ).val()+'"}'
+
 			
-			alert(data)
-			$.post( "/api/v1/capacitor/", data );
+			$.post( "/api/v1/capacitor/", data, 
+				function( data ) {
+					$( "#totalPrice" ).html(data.price)
+					$( "#totalExecs" ).html(data.execs)
+					$("#panelExecPath").empty();
+					jQuery.each( data.path, function( i, val ) {
+						var row = '<a href="#" class="list-group-item">'
+						row = row + val.level+' <i class="fa fa-leaf fa-fw"></i> '
+						row = row + '('+val.size+') '+val.name+' <i class="fa fa-cloud fa-fw"></i> '
+						//row = row + val.size + ' <i class="fa fa-gears fa-fw"></i> '
+						row = row + '<span class="pull-right text-muted small"><i class="fa fa-users fa-fw"></i><em>'+ val.workload +' users</em></span>'
+						row = row + '</a>'
+						$("#panelExecPath").append(row)
+						});
+				}
+			      , "json" );
 		 }
 	);
     </script>

@@ -86,23 +86,23 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 		wkls[i] = strconv.Itoa(d)
 	}
 
-	//log.Printf("%v,%v,%v,%v\n", config, price, size, wkls)
-
 	execInfo := h.Exec(config.Mode, float32(config.Slo), wkls)
 
-	str := GetExecPath(execInfo, wkls, config.Mode, &c)
+	str := ExecPathSummary(execInfo, wkls, config.Mode, &c)
 
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Fprintf(w, "%v", str)
 }
 
-func GetExecPath(winner capacitor.ExecInfo, wkls []string, mode string, c *capacitor.Capacitor) (str string) {
+func ExecPathSummary(winner capacitor.ExecInfo, wkls []string, mode string, c *capacitor.Capacitor) (str string) {
 	nos := make([]*capacitor.Node, 0, 28)
 
 	for _, n := range *c.Dspace.CapacityBy(mode) {
 		nos = append(nos, n...)
 	}
 	nodes := capacitor.Nodes(nos)
+	execs := 0
+	price := float32(0.0)
 
 	path := strings.Split(winner.Path, "->")
 	str = "["
@@ -110,10 +110,12 @@ func GetExecPath(winner capacitor.ExecInfo, wkls []string, mode string, c *capac
 		ID, cWKL := capacitor.SplitMatrixKey(key)
 		if cWKL != -1 {
 			node := nodes.NodeByID(ID)
-			str = fmt.Sprintf("%v{\"key\":\"%v\", \"workload\":%v, \"level\":%v,  \"name\":\"%v\", \"price\":%v, \"size\":%v},", str, key, wkls[cWKL], node.Level, node.Configs[0].Name, node.Configs[0].Price(), node.Configs[0].Size)
+			str = fmt.Sprintf("%v{\"key\":\"%v\", \"workload\":%v, \"level\":%v,  \"name\":\"%v\", \"price\":%.2f, \"size\":%v},", str, key, wkls[cWKL], node.Level, node.Configs[0].Name, node.Configs[0].Price(), node.Configs[0].Size)
+			execs = execs + len(node.Configs)
+			price = price + node.Configs[0].Price()
 		}
 	}
 	//one extra comma
-	str = fmt.Sprintf("%v]", str[0:len(str)-1])
+	str = fmt.Sprintf("{\"execs\":%v, \"price\":%.2f, \"path\":%v]}", execs, price, str[0:len(str)-1])
 	return str
 }
