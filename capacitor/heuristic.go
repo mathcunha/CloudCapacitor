@@ -26,7 +26,7 @@ type NodeExec struct {
 }
 
 type Heuristic interface {
-	Exec(mode string, slo float32, wkls []string) ExecInfo
+	Exec(mode string, slo float32, wkls []string) (ExecInfo, map[string]NodesInfo)
 }
 
 //Execute all configurations and workloads without infer
@@ -69,7 +69,7 @@ func NewShortestPath(c *Capacitor) (h *ShortestPath) {
 	return
 }
 
-func (bf *BrutalForce) Exec(mode string, slo float32, wkls []string) (path ExecInfo) {
+func (bf *BrutalForce) Exec(mode string, slo float32, wkls []string) (path ExecInfo, dspaceInfo map[string]NodesInfo) {
 	mapa := bf.c.Dspace.CapacityBy(mode)
 	for _, nodes := range *mapa {
 		for _, node := range nodes {
@@ -82,26 +82,26 @@ func (bf *BrutalForce) Exec(mode string, slo float32, wkls []string) (path ExecI
 		}
 	}
 	//TODO
-	return ExecInfo{0, "", 0}
+	return ExecInfo{0, "", 0}, make(map[string]NodesInfo)
 }
 
-func (h *ShortestPath) Exec(mode string, slo float32, wkls []string) (path ExecInfo) {
+func (h *ShortestPath) Exec(mode string, slo float32, wkls []string) (path ExecInfo, dspaceInfo map[string]NodesInfo) {
 	mapa := h.c.Dspace.CapacityBy(mode)
 	h.slo = slo
 	for _, nodes := range *mapa {
 		h.ExecCategory(wkls, nodes)
 	}
 	//TODO
-	return ExecInfo{0, "", 0}
+	return ExecInfo{0, "", 0}, make(map[string]NodesInfo)
 }
 
-func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo) {
+func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, dspaceInfo map[string]NodesInfo) {
 	dspace := h.c.Dspace.CapacityBy(mode)
 
 	execInfo := ExecInfo{0, "", 0}
 
 	//map to store the results by category
-	dspaceInfo := make(map[string]NodesInfo)
+	dspaceInfo = make(map[string]NodesInfo)
 
 	for cat, nodes := range *dspace {
 		dspaceInfo[cat] = buildMatrix(wkls, nodes)
@@ -113,7 +113,7 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo) {
 		level := h.selectCapacityLevel(&nodesInfo, key, &nodes)
 		wkl := h.selectWorkload(&nodesInfo, key)
 		key = GetMatrixKey(nodes.NodeByLevel(level).ID, wkl)
-		nodeInfo := nodesInfo.matrix[key]
+		nodeInfo := nodesInfo.Matrix[key]
 
 		//Process main loop, basically there will be no blank space
 		for h.c.HasMore(&nodesInfo) {
@@ -129,7 +129,7 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo) {
 			equivalent := nodes.Equivalents((&nodeInfo.Node))
 			for _, node := range equivalent {
 				key = GetMatrixKey(node.ID, wkl)
-				nodeInfo = nodesInfo.matrix[key]
+				nodeInfo = nodesInfo.Matrix[key]
 				if !(nodeInfo.When != -1) {
 					result := h.c.Executor.Execute(*nodeInfo.Configs[0], nodeInfo.WKL)
 					//log.Printf("[Policy.Exec] WKL:%v Result:%v\n", wkls[wkl], result)
@@ -162,12 +162,12 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo) {
 
 			//next config
 			key = GetMatrixKey(nodes.NodeByLevel(level).ID, wkl)
-			nodeInfo = nodesInfo.matrix[key]
+			nodeInfo = nodesInfo.Matrix[key]
 		}
 		//log.Printf("[Policy.Exec] Category:%v Execs:%v", cat, execInfo.execs)
 	}
 
-	return execInfo
+	return execInfo, dspaceInfo
 }
 
 func HasMore(c *Capacitor, dspaceInfo map[string]NodesInfo) (hasMore bool) {
@@ -179,10 +179,10 @@ func HasMore(c *Capacitor, dspaceInfo map[string]NodesInfo) (hasMore bool) {
 }
 
 func (p *Policy) selectStartingPoint(nodesInfo *NodesInfo, nodes *Nodes) (key string) {
-	for level := 1; level <= nodesInfo.levels; level++ {
-		for wkl := 0; wkl < nodesInfo.workloads; wkl++ {
+	for level := 1; level <= nodesInfo.Levels; level++ {
+		for wkl := 0; wkl < nodesInfo.Workloads; wkl++ {
 			key = GetMatrixKey(nodes.NodeByLevel(level).ID, wkl)
-			nodeInfo := nodesInfo.matrix[key]
+			nodeInfo := nodesInfo.Matrix[key]
 			if nodeInfo.When == -1 {
 				return
 			} else {
@@ -190,7 +190,7 @@ func (p *Policy) selectStartingPoint(nodesInfo *NodesInfo, nodes *Nodes) (key st
 				equivalents := nodes.Equivalents((&nodeInfo.Node))
 				for _, node := range equivalents {
 					key = GetMatrixKey(node.ID, wkl)
-					nodeInfo := nodesInfo.matrix[key]
+					nodeInfo := nodesInfo.Matrix[key]
 					if nodeInfo.When == -1 {
 						return
 					}
@@ -240,10 +240,10 @@ func (p *Policy) selectCapacityLevel(nodesInfo *NodesInfo, key string, nodes *No
 
 //Workloads availables in the current capacity level
 func (p *Policy) buildWorkloadList(key string, nodesInfo *NodesInfo) (wkl int, wkls []int) {
-	wkls = make([]int, 0, nodesInfo.workloads)
+	wkls = make([]int, 0, nodesInfo.Workloads)
 	ID, wkl := SplitMatrixKey(key)
-	for i := 0; i < nodesInfo.workloads; i++ {
-		nodeInfo := nodesInfo.matrix[GetMatrixKey(ID, i)]
+	for i := 0; i < nodesInfo.Workloads; i++ {
+		nodeInfo := nodesInfo.Matrix[GetMatrixKey(ID, i)]
 		if nodeInfo.When == -1 {
 			wkls = append(wkls, i)
 		}
@@ -254,17 +254,17 @@ func (p *Policy) buildWorkloadList(key string, nodesInfo *NodesInfo) (wkl int, w
 
 //capacity levels availables in the current workload
 func (p *Policy) buildCapacityLevelList(key string, nodesInfo *NodesInfo, nodes *Nodes) (ID string, levels []int) {
-	levels = make([]int, 0, nodesInfo.levels)
+	levels = make([]int, 0, nodesInfo.Levels)
 	ID, wkl := SplitMatrixKey(key)
-	for i := 1; i <= nodesInfo.levels; i++ {
-		nodeInfo := nodesInfo.matrix[GetMatrixKey(nodes.NodeByLevel(i).ID, wkl)]
+	for i := 1; i <= nodesInfo.Levels; i++ {
+		nodeInfo := nodesInfo.Matrix[GetMatrixKey(nodes.NodeByLevel(i).ID, wkl)]
 		if nodeInfo.When == -1 {
 			levels = append(levels, i)
 		} else {
 			//Same level, but, possibly, different lowers and highers
 			equivalents := nodes.Equivalents((&nodeInfo.Node))
 			for _, node := range equivalents {
-				nodeInfo := nodesInfo.matrix[GetMatrixKey(node.ID, wkl)]
+				nodeInfo := nodesInfo.Matrix[GetMatrixKey(node.ID, wkl)]
 				if nodeInfo.When == -1 {
 					levels = append(levels, i)
 					break
@@ -331,7 +331,7 @@ func (h *ShortestPath) findShortestPath(current []NodeExec, wg *sync2.BlockWaitG
 	nexts = *(new([]NodeExec))
 	lessNodes := numConfigs
 	for _, ex := range current {
-		for key, node := range ex.nodes.matrix {
+		for key, node := range ex.nodes.Matrix {
 			if !(node.When != -1) {
 				cNodes := ex.nodes.Clone()
 				nExecs := ex.Execs

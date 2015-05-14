@@ -19,7 +19,7 @@ func TestHeuristicConservative(t *testing.T) {
 	h := NewPolicy(&c, Conservative, Conservative)
 	mode := "Strict"
 	wkls := []string{"100", "200", "300", "400", "500", "600", "700", "800", "900", "1000"}
-	execInfo := h.Exec(mode, float32(20000), wkls)
+	execInfo, _ := h.Exec(mode, float32(20000), wkls)
 
 	nodes := make([]*Node, 0, 28)
 
@@ -45,7 +45,7 @@ func TestHeuristicOptimistic(t *testing.T) {
 	h := NewPolicy(&c, Optimistic, Optimistic)
 	mode := "Strict"
 	wkls := []string{"100", "200", "300", "400", "500", "600", "700", "800", "900", "1000"}
-	execInfo := h.Exec(mode, float32(20000), wkls)
+	execInfo, _ := h.Exec(mode, float32(20000), wkls)
 
 	nodes := make([]*Node, 0, 28)
 
@@ -71,7 +71,7 @@ func TestHeuristicPessimistic(t *testing.T) {
 	h := NewPolicy(&c, Pessimistic, Pessimistic)
 	mode := "Strict"
 	wkls := []string{"100", "200", "300", "400", "500", "600", "700", "800", "900", "1000"}
-	execInfo := h.Exec(mode, float32(20000), wkls)
+	execInfo, _ := h.Exec(mode, float32(20000), wkls)
 
 	nodes := make([]*Node, 0, 28)
 

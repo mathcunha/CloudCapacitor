@@ -411,7 +411,7 @@
                             <i class="fa fa-eye fa-fw"></i> Execution Full Trace
                         </div>
                         <!-- /.panel-heading -->
-                        <div class="panel-body">
+                        <div class="panel-body" id="panelFullTrace">
 				<table class="table">
 					<thead>
 						<tr>
@@ -499,6 +499,16 @@
     <!-- Custom Theme JavaScript -->
     <script src="../js/sb-admin-2.js"></script>
 	<script>
+	
+	function highlightTableFlow(exec) {
+		tds = 'fullTrace'+exec
+		$( "#tableFullTrace").find('td').each(function () {
+				$(this).removeClass('td-marked')
+				if ($(this).attr('id') == tds){
+					$(this).toggleClass('td-marked')
+				}
+				});
+	}
 
 	$("#button_execute").click( 
 		function(){
@@ -514,16 +524,56 @@
 				function( data ) {
 					$( "#totalPrice" ).html(data.price)
 					$( "#totalExecs" ).html(data.execs)
-					$("#panelExecPath").empty();
+					$( "#panelExecPath" ).empty();
+					var totalExec = 0
 					jQuery.each( data.path, function( i, val ) {
-						var row = '<a href="#" class="list-group-item">'
-						row = row + val.level+' <i class="fa fa-leaf fa-fw"></i> '
+						totalExec = totalExec+1
+						var row = '<a href="javascript:highlightTableFlow('+totalExec+')" class="list-group-item"> #'+totalExec+" - "
+						row = row + val.level+'<i class="fa fa-leaf fa-fw"></i> '
 						row = row + '('+val.size+') '+val.name+' <i class="fa fa-cloud fa-fw"></i> '
 						//row = row + val.size + ' <i class="fa fa-gears fa-fw"></i> '
 						row = row + '<span class="pull-right text-muted small"><i class="fa fa-users fa-fw"></i><em>'+ val.workload +' users</em></span>'
 						row = row + '</a>'
 						$("#panelExecPath").append(row)
 						});
+
+					$( "#panelFullTrace" ).empty();
+					var newTable = '<table class="table" id="tableFullTrace"> <thead> <tr> <th>Config</th>';
+					jQuery.each($( '#demand' ).val() , function( i, val ) {
+							newTable = newTable + '<th>'+val+'</th>';
+					});
+					newTable = newTable + '</tr></thead><tbody>';
+					jQuery.each( data.spaceInfo, function( i, val ) {
+						newTable = newTable + '<tr> <td class="deactive">('+val.size+') '+val.name+'</td>';
+						jQuery.each( val.wkl, function( j, wklInfo) {
+							newTable = newTable + '<td class="deactive" id="fullTrace'+wklInfo.when+'">'
+
+							executed = 'fa-info-circle'
+							if (wklInfo.exec){
+								executed = 'fa-check-circle'
+							}
+							
+							right = '<i class="fa fa-thumbs-o-down fa-fw" style="color:red">'
+							if (wklInfo.right){
+								right = '<i class="fa fa-thumbs-o-up fa-fw" style="color:green">'
+							}
+							cadidate = 'red'
+							if (wklInfo.cadidate){
+								cadidate  = 'green'
+							}
+
+							newTable = newTable + '<i class="fa '+executed+' fa-fw" style="color:'+cadidate+'"></i>';
+
+
+							newTable = newTable + wklInfo.when;
+
+							newTable = newTable + right + '</td>'
+						});
+						newTable = newTable + '</tr>'
+					});
+					newTable = newTable + '</tbody></table>';
+					$( "#panelFullTrace" ).append(newTable);
+
 				}
 			      , "json" );
 		 }

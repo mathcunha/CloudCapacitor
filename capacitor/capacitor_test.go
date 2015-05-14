@@ -24,7 +24,7 @@ func TestMarkStrict(t *testing.T) {
 	clone := matrix.Clone()
 	clone.Mark("1_c3_large#0", true, 1)
 
-	if !clone.matrix["1_c3_2xlarge#0"].Candidate {
+	if !clone.Matrix["1_c3_2xlarge#0"].Candidate {
 		t.Fail()
 	}
 }
@@ -57,7 +57,7 @@ func TestMarkMem(t *testing.T) {
 	clone = matrix.Clone()
 	clone.Mark("7.50#1", true, 1)
 	clone.Mark("7.50#1", false, 2)
-	if clone.matrix["3.75#0"].When != -1 {
+	if clone.Matrix["3.75#0"].When != -1 {
 		t.Fail()
 	}
 }

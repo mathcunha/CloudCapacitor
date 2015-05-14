@@ -86,12 +86,51 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 		wkls[i] = strconv.Itoa(d)
 	}
 
-	execInfo := h.Exec(config.Mode, float32(config.Slo), wkls)
+	execInfo, dspaceInfo := h.Exec(config.Mode, float32(config.Slo), wkls)
 
 	str := ExecPathSummary(execInfo, wkls, config.Mode, &c)
+	str = fmt.Sprintf("%v, \"spaceInfo\":%v}", str[0:len(str)-1], DeploymentSpace(execInfo, wkls, config.Mode, &c, dspaceInfo, m, float32(config.Slo)))
 
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Fprintf(w, "%v", str)
+}
+
+func DeploymentSpace(winner capacitor.ExecInfo, wkls []string, mode string, c *capacitor.Capacitor, dspaceInfo map[string]capacitor.NodesInfo, executor capacitor.Executor, slo float32) (str string) {
+	nodeMap := *c.Dspace.CapacityBy(mode)
+
+	str = "["
+	for cat, nodesInfo := range dspaceInfo {
+		nodes := nodeMap[cat]
+		for level := 1; level <= nodesInfo.Levels; level++ {
+			node := nodes.NodeByLevel(level)
+			for wkl := 0; wkl < nodesInfo.Workloads; wkl++ {
+				str = fmt.Sprintf("%v%v", str, PrintNodeExecInfo(node, wkl, nodesInfo, executor, slo))
+			}
+			for _, e := range nodes.Equivalents(node) {
+				for wkl := 0; wkl < nodesInfo.Workloads; wkl++ {
+					str = fmt.Sprintf("%v%v", str, PrintNodeExecInfo(e, wkl, nodesInfo, executor, slo))
+				}
+			}
+		}
+	}
+	str = fmt.Sprintf("%v]", str[0:len(str)-1])
+	return
+}
+
+func PrintNodeExecInfo(node *capacitor.Node, wkl int, nodesInfo capacitor.NodesInfo, executor capacitor.Executor, slo float32) (str string) {
+	key := capacitor.GetMatrixKey(node.ID, wkl)
+	nodeInfo := nodesInfo.Matrix[key]
+	if wkl == 0 {
+		str = fmt.Sprintf("%v{\"name\":\"%v\", \"size\":%v, \"wkl\":[", str, node.Configs[0].Name, node.Configs[0].Size)
+	}
+	result := executor.Execute(*node.Configs[0], nodeInfo.WKL)
+	metSLO := result.SLO <= slo
+	right := nodeInfo.Candidate == metSLO
+	str = fmt.Sprintf("%v{\"wkl\":\"%v\", \"when\":%v, \"exec\":%v, \"cadidate\":%v, \"right\":%v},", str, nodeInfo.WKL, nodeInfo.When, nodeInfo.Exec, nodeInfo.Candidate, right)
+	if wkl == nodesInfo.Workloads-1 {
+		str = fmt.Sprintf("%v]},", str[0:len(str)-1])
+	}
+	return
 }
 
 func ExecPathSummary(winner capacitor.ExecInfo, wkls []string, mode string, c *capacitor.Capacitor) (str string) {
