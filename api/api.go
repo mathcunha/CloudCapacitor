@@ -99,7 +99,8 @@ func DeploymentSpace(winner capacitor.ExecInfo, wkls []string, mode string, c *c
 	nodeMap := *c.Dspace.CapacityBy(mode)
 
 	str = "["
-	for cat, nodesInfo := range dspaceInfo {
+	for _, cat := range c.Dspace.Categories() {
+		nodesInfo := dspaceInfo[cat]
 		nodes := nodeMap[cat]
 		for level := 1; level <= nodesInfo.Levels; level++ {
 			node := nodes.NodeByLevel(level)
@@ -121,9 +122,9 @@ func PrintNodeExecInfo(node *capacitor.Node, wkl int, nodesInfo capacitor.NodesI
 	key := capacitor.GetMatrixKey(node.ID, wkl)
 	nodeInfo := nodesInfo.Matrix[key]
 	if wkl == 0 {
-		str = fmt.Sprintf("%v{\"name\":\"%v\", \"size\":%v, \"wkl\":[", str, node.Configs[0].Name, node.Configs[0].Size)
+		str = fmt.Sprintf("%v{\"name\":\"%v\", \"size\":%v, \"wkl\":[", str, node.Config.Name, node.Config.Size)
 	}
-	result := executor.Execute(*node.Configs[0], nodeInfo.WKL)
+	result := executor.Execute(*node.Config, nodeInfo.WKL)
 	metSLO := result.SLO <= slo
 	right := nodeInfo.Candidate == metSLO
 	str = fmt.Sprintf("%v{\"wkl\":\"%v\", \"when\":%v, \"exec\":%v, \"cadidate\":%v, \"right\":%v},", str, nodeInfo.WKL, nodeInfo.When, nodeInfo.Exec, nodeInfo.Candidate, right)
@@ -149,9 +150,9 @@ func ExecPathSummary(winner capacitor.ExecInfo, wkls []string, mode string, c *c
 		ID, cWKL := capacitor.SplitMatrixKey(key)
 		if cWKL != -1 {
 			node := nodes.NodeByID(ID)
-			str = fmt.Sprintf("%v{\"key\":\"%v\", \"workload\":%v, \"level\":%v,  \"name\":\"%v\", \"price\":%.2f, \"size\":%v},", str, key, wkls[cWKL], node.Level, node.Configs[0].Name, node.Configs[0].Price(), node.Configs[0].Size)
-			execs = execs + len(node.Configs)
-			price = price + float64(node.Configs[0].Price())
+			str = fmt.Sprintf("%v{\"key\":\"%v\", \"workload\":%v, \"level\":%v,  \"name\":\"%v\", \"price\":%.2f, \"size\":%v},", str, key, wkls[cWKL], node.Level, node.Config.Name, node.Config.Price(), node.Config.Size)
+			execs++
+			price = price + float64(node.Config.Price())
 		}
 	}
 	//one extra comma

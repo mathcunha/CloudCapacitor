@@ -47,17 +47,17 @@ func TestMarkMem(t *testing.T) {
 	matrix := buildMatrix([]string{"100", "200", "300", "400", "500", "600", "700", "800", "900", "1000"}, M["c3"])
 
 	clone := matrix.Clone()
-	clone.Mark("3.75#2", true, 1)
-	clone.Mark("3.75#1", false, 2)
+	clone.Mark("1_c3_large#2", true, 1)
+	clone.Mark("1_c3_large#1", false, 2)
 	if c.NodesLeft(clone) != 0 {
 		t.Fail()
 	}
 
 	matrix = buildMatrix([]string{"100", "200", "300", "400", "500", "600", "700", "800", "900", "1000"}, M["m3"])
 	clone = matrix.Clone()
-	clone.Mark("7.50#1", true, 1)
-	clone.Mark("7.50#1", false, 2)
-	if clone.Matrix["3.75#0"].When != -1 {
+	clone.Mark("2_m3_medium#1", true, 1)
+	clone.Mark("2_m3_medium#1", false, 2)
+	if clone.Matrix["1_m3_medium#0"].When != -1 {
 		t.Fail()
 	}
 }

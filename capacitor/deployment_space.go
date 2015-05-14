@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-	"strconv"
 )
 
 type Node struct {
@@ -12,13 +11,14 @@ type Node struct {
 	Level  int
 	Higher Nodes
 	Lower  Nodes
-	Configs
+	Config *Configuration
 }
 
 type Nodes []*Node
 
 type DeploymentSpace struct {
 	configs *map[string]Configs
+	cats    []string
 }
 
 type Configs []*Configuration
@@ -37,6 +37,7 @@ func (s byStrict) Less(i, j int) bool { return s.Configs[i].Strict() < s.Configs
 
 func NewDeploymentSpace(vms *[]VM, price float32, size int) (dspace DeploymentSpace) {
 	mapa := make(map[string]Configs)
+	categories := make(map[string]string)
 	atLeatOne := true
 	for i := 1; i <= size && atLeatOne; i++ {
 		atLeatOne = false
@@ -47,10 +48,20 @@ func NewDeploymentSpace(vms *[]VM, price float32, size int) (dspace DeploymentSp
 				conf := mapa[c.Category]
 				conf = append(conf, &c)
 				mapa[c.Category] = conf
+				categories[c.Category] = c.Category
 			}
 		}
 	}
-	return DeploymentSpace{&mapa}
+	cats := make([]string, 0, 5)
+	for cat, _ := range categories {
+		cats = append(cats, cat)
+	}
+	sort.Strings(cats)
+	return DeploymentSpace{&mapa, cats}
+}
+
+func (dspace *DeploymentSpace) Categories() []string {
+	return dspace.cats
 }
 
 func (dspace *DeploymentSpace) CapacityBy(prop string) (list *map[string]Nodes) {
@@ -82,7 +93,7 @@ func (dspace *DeploymentSpace) buildNodesStrict(prop string) *map[string]Nodes {
 		for i, c := range configs {
 			nodes[i] = new(Node)
 			nodes[i].ID = fmt.Sprintf("%v_%v", c.Size, c.Name)
-			nodes[i].Configs = Configs{c}
+			nodes[i].Config = c
 			if i == 0 {
 				mapa[cat] = Nodes{}
 			}
@@ -91,8 +102,8 @@ func (dspace *DeploymentSpace) buildNodesStrict(prop string) *map[string]Nodes {
 		//link nodes with their highers and lowers
 		for _, out := range nodes {
 			for _, in := range nodes {
-				if out.Configs[0].Name == in.Configs[0].Name {
-					if out.Configs[0].Size+1 == in.Configs[0].Size {
+				if out.Config.Name == in.Config.Name {
+					if out.Config.Size+1 == in.Config.Size {
 						if out.Lower == nil {
 							out.Lower = Nodes{}
 						}
@@ -103,8 +114,8 @@ func (dspace *DeploymentSpace) buildNodesStrict(prop string) *map[string]Nodes {
 						in.Higher = append(in.Higher, out)
 					}
 				}
-				if out.Configs[0].Size == in.Configs[0].Size {
-					if out.Configs[0].Strict()*2 == in.Configs[0].Strict() {
+				if out.Config.Size == in.Config.Size {
+					if out.Config.Strict()*2 == in.Config.Strict() {
 						if out.Lower == nil {
 							out.Lower = Nodes{}
 						}
@@ -144,61 +155,62 @@ func (nodes *Nodes) Equivalents(n *Node) Nodes {
 
 func (dspace *DeploymentSpace) buildNodes(prop string) *map[string]Nodes {
 	mapa := make(map[string]Nodes)
+
 	for cat, configs := range *dspace.configs {
-		v := reflect.ValueOf(configs[0]).MethodByName(prop).Call(nil)
-		node := new(Node)
-		equal, ID := equalID(v[0], v[0])
-		node.ID = ID
-		node.Level = 0
-		for _, c := range configs {
-			equal, ID = equalID(v[0], reflect.ValueOf(c).MethodByName(prop).Call(nil)[0])
-			if equal {
-				node.Configs = append(node.Configs, c)
-			} else {
-				updateMap(&mapa, node, cat)
-				node = new(Node)
-				node.ID = ID
-				node.Configs = append(node.Configs, c)
+		nodes := make([]*Node, len(configs), len(configs))
+		level := 0
+		var v []reflect.Value
+
+		//create each node
+		for i, c := range configs {
+			if i == 0 {
+				level++
 				v = reflect.ValueOf(c).MethodByName(prop).Call(nil)
+			} else {
+				value := reflect.ValueOf(c).MethodByName(prop).Call(nil)
+				if !equalID(v[0], value[0]) {
+					level++
+					v = value
+				}
+			}
+			nodes[i] = new(Node)
+			nodes[i].ID = fmt.Sprintf("%v_%v", c.Size, c.Name)
+			nodes[i].Config = c
+			if i == 0 {
+				mapa[cat] = Nodes{}
+			}
+			mapa[cat] = append(mapa[cat], nodes[i])
+			nodes[i].Level = level
+		}
+		//link nodes with their highers and lowers
+		for _, out := range nodes {
+			for _, in := range nodes {
+				if out.Level == in.Level+1 {
+					//set higher
+					if out.Higher == nil {
+						out.Higher = Nodes{}
+					}
+					out.Higher = append(out.Higher, in)
+				} else if out.Level == in.Level-1 {
+					//set lower
+					if out.Lower == nil {
+						out.Lower = Nodes{}
+					}
+					out.Lower = append(out.Lower, in)
+				}
 			}
 		}
-
-		if node != nil {
-			updateMap(&mapa, node, cat)
-		}
 	}
-
 	return &mapa
 }
 
-func updateMap(mapa *map[string]Nodes, node *Node, cat string) {
-	m := *mapa
-	n, has := m[cat]
-	if has {
-		max := len(n)
-		nodes := append(n, node)
-
-		nodes[max].Higher = Nodes{nodes[max-1]}
-		nodes[max-1].Lower = Nodes{nodes[max]}
-		nodes[max].Level = max + 1
-
-		m[cat] = nodes
-	} else {
-		node.Higher = nil
-		node.Level = 1
-
-		m[cat] = Nodes{node}
-	}
-	node = nil
-}
-
-func equalID(x reflect.Value, y reflect.Value) (equal bool, id string) {
+func equalID(x reflect.Value, y reflect.Value) (equal bool) {
 	switch y.Kind() {
 	case reflect.Float32:
-		return x.Float() == y.Float(), strconv.FormatFloat(y.Float(), 'f', 2, 32)
+		return x.Float() == y.Float()
 	}
 
-	return false, ""
+	return false
 }
 
 func (dspace DeploymentSpace) String() string {
@@ -235,7 +247,7 @@ func (n Node) String() string {
 	} else {
 		str = fmt.Sprintf("%v, leaf:true", str)
 	}
-	return fmt.Sprintf("%v,configs:%v}", str, n.Configs)
+	return fmt.Sprintf("%v,config:%v}", str, n.Config)
 }
 
 func (nodes Nodes) String() string {

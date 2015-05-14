@@ -73,7 +73,7 @@ func (bf *BrutalForce) Exec(mode string, slo float32, wkls []string) (path ExecI
 	mapa := bf.c.Dspace.CapacityBy(mode)
 	for _, nodes := range *mapa {
 		for _, node := range nodes {
-			for _, conf := range node.Configs {
+			if conf := node.Config; conf != nil {
 				for _, wkl := range wkls {
 					result := bf.c.Executor.Execute(*conf, wkl)
 					log.Printf("%v x %v ? %v \n", *conf, wkl, result.SLO <= slo)
@@ -103,7 +103,8 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 	//map to store the results by category
 	dspaceInfo = make(map[string]NodesInfo)
 
-	for cat, nodes := range *dspace {
+	for _, cat := range h.c.Dspace.Categories() {
+		nodes := (*dspace)[cat]
 		dspaceInfo[cat] = buildMatrix(wkls, nodes)
 
 		nodesInfo := dspaceInfo[cat]
@@ -118,7 +119,7 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 		//Process main loop, basically there will be no blank space
 		for h.c.HasMore(&nodesInfo) {
 			if !(nodeInfo.When != -1) {
-				result := h.c.Executor.Execute(*nodeInfo.Configs[0], nodeInfo.WKL)
+				result := h.c.Executor.Execute(*nodeInfo.Config, nodeInfo.WKL)
 				//log.Printf("[Policy.Exec] WKL:%v Result:%v\n", wkls[wkl], result)
 				execInfo.Path = fmt.Sprintf("%v%v->", execInfo.Path, key)
 				execInfo.Execs++
@@ -131,7 +132,7 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 				key = GetMatrixKey(node.ID, wkl)
 				nodeInfo = nodesInfo.Matrix[key]
 				if !(nodeInfo.When != -1) {
-					result := h.c.Executor.Execute(*nodeInfo.Configs[0], nodeInfo.WKL)
+					result := h.c.Executor.Execute(*nodeInfo.Config, nodeInfo.WKL)
 					//log.Printf("[Policy.Exec] WKL:%v Result:%v\n", wkls[wkl], result)
 					execInfo.Path = fmt.Sprintf("%v%v->", execInfo.Path, key)
 					execInfo.Execs++
@@ -277,10 +278,7 @@ func (p *Policy) buildCapacityLevelList(key string, nodesInfo *NodesInfo, nodes 
 }
 
 func (h *ShortestPath) ExecCategory(wkls []string, nodes Nodes) {
-	numConfigs := 0
-	for _, node := range nodes {
-		numConfigs = numConfigs + len(node.Configs)
-	}
+	numConfigs := len(nodes)
 	h.maxIt = len(wkls) * numConfigs
 
 	nexts := []NodeExec{NodeExec{buildMatrix(wkls, nodes), ExecInfo{0, "", 0}}}
@@ -319,8 +317,8 @@ func PrintExecPath(winner ExecInfo, wkls []string, nodes Nodes) {
 		ID, cWKL := SplitMatrixKey(key)
 		if cWKL != -1 {
 			node := nodes.NodeByID(ID)
-			str = fmt.Sprintf("%v{Workload:%v, Level:%v, Configs:%v}\n", str, wkls[cWKL], node.Level, node.Configs)
-			execs = execs + len(node.Configs)
+			str = fmt.Sprintf("%v{Workload:%v, Level:%v, Config:%v}\n", str, wkls[cWKL], node.Level, node.Config)
+			execs++
 		}
 	}
 	str = fmt.Sprintf("%vTotal Execs:%v", str, execs)
@@ -336,7 +334,7 @@ func (h *ShortestPath) findShortestPath(current []NodeExec, wg *sync2.BlockWaitG
 				cNodes := ex.nodes.Clone()
 				nExecs := ex.Execs
 				var result Result
-				for _, conf := range node.Configs {
+				if conf := node.Config; conf != nil {
 					nExecs = nExecs + 1
 					result = h.c.Executor.Execute(*conf, node.WKL)
 					cNodes.Mark(key, result.SLO <= h.slo, nExecs)
