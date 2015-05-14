@@ -141,7 +141,7 @@ func ExecPathSummary(winner capacitor.ExecInfo, wkls []string, mode string, c *c
 	}
 	nodes := capacitor.Nodes(nos)
 	execs := 0
-	price := float32(0.0)
+	price := 0.0
 
 	path := strings.Split(winner.Path, "->")
 	str = "["
@@ -151,7 +151,7 @@ func ExecPathSummary(winner capacitor.ExecInfo, wkls []string, mode string, c *c
 			node := nodes.NodeByID(ID)
 			str = fmt.Sprintf("%v{\"key\":\"%v\", \"workload\":%v, \"level\":%v,  \"name\":\"%v\", \"price\":%.2f, \"size\":%v},", str, key, wkls[cWKL], node.Level, node.Configs[0].Name, node.Configs[0].Price(), node.Configs[0].Size)
 			execs = execs + len(node.Configs)
-			price = price + node.Configs[0].Price()
+			price = price + float64(node.Configs[0].Price())
 		}
 	}
 	//one extra comma
