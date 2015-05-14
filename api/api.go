@@ -14,7 +14,7 @@ import (
 func restHandlerV1(w http.ResponseWriter, r *http.Request) {
 	a_path := strings.Split(r.URL.Path, "/")
 	if "POST" != r.Method {
-		http.Error(w, "method not allowed, try curl -X POST https://cloudcapacitor.herokuapp.com/api/v1/capacitor", http.StatusMethodNotAllowed)
+		http.Error(w, "method not allowed, try curl -d '{\"slo\":20000, \"demand\":[100], \"wkl\":\"optimistic\", \"configuration\":\"optimistic\", \"mode\":\"Strict\"}' -X POST https://cloudcapacitor.herokuapp.com/api/v1/capacitor", http.StatusMethodNotAllowed)
 		return
 	}
 	if "capacitor" != a_path[3] {
