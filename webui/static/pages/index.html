@@ -508,6 +508,8 @@
 					$(this).toggleClass('td-marked')
 				}
 				});
+		aTag = $("a[name='fullTraceExec"+ exec +"']");
+		$('html,body').animate({scrollTop: aTag.offset().top},'slow');
 	}
 
 	$("#button_execute").click( 
@@ -551,6 +553,7 @@
 							executed = 'fa-info-circle'
 							if (wklInfo.exec){
 								executed = 'fa-check-circle'
+								newTable = newTable + '<a name="fullTraceExec'+ wklInfo.when +'"></a>'
 							}
 							
 							right = '<i class="fa fa-thumbs-o-down fa-fw" style="color:red">'
