@@ -66,7 +66,12 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	vms, err := capacitor.LoadTypes("config/dspace.yml")
+	file := "config/dspace.yml"
+	if !config.Category {
+		file = "config/dspace_nocat.yml"
+	}
+
+	vms, err := capacitor.LoadTypes(file)
 	if err != nil {
 		log.Println("ERROR: callCapacitorResource loanding vm types")
 		return
