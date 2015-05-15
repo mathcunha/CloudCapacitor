@@ -69,20 +69,30 @@ func NewBrutalForce(c *Capacitor) (h *BrutalForce) {
 	return
 }
 
-func (bf *BrutalForce) Exec(mode string, slo float32, wkls []string) (path ExecInfo, dspaceInfo map[string]NodesInfo) {
-	mapa := bf.c.Dspace.CapacityBy(mode)
-	for _, nodes := range *mapa {
-		for _, node := range nodes {
-			if conf := node.Config; conf != nil {
-				for _, wkl := range wkls {
-					result := bf.c.Executor.Execute(*conf, wkl)
-					log.Printf("%v x %v ? %v \n", *conf, wkl, result.SLO <= slo)
-				}
+func (h *BrutalForce) Exec(mode string, slo float32, wkls []string) (path ExecInfo, dspaceInfo map[string]NodesInfo) {
+	dspace := h.c.Dspace.CapacityBy(mode)
+	execInfo := ExecInfo{0, ""}
+
+	//map to store the results by category
+	dspaceInfo = make(map[string]NodesInfo)
+	for _, cat := range h.c.Dspace.Categories() {
+		nodes := (*dspace)[cat]
+		nodesInfo := buildMatrix(wkls, nodes)
+		for key, node := range nodesInfo.Matrix {
+			result := h.c.Executor.Execute(*node.Config, node.WKL)
+			execInfo.Path = fmt.Sprintf("%v%v->", execInfo.Path, key)
+			execInfo.Execs++
+			node.When = execInfo.Execs
+			node.Exec = true
+			if result.SLO <= slo {
+				node.Candidate = true
+			} else {
+				node.Reject = true
 			}
 		}
+		dspaceInfo[cat] = nodesInfo
 	}
-	//TODO
-	return ExecInfo{0, ""}, make(map[string]NodesInfo)
+	return execInfo, dspaceInfo
 }
 
 func (h *ShortestPath) Exec(mode string, slo float32, wkls []string) (path ExecInfo, dspaceInfo map[string]NodesInfo) {

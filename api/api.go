@@ -47,16 +47,16 @@ func getPort() string {
 }
 
 func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
-	price := 7.0
-	size := 4
 	var config struct {
-		Slo           int    `json:"slo"`
-		Mode          string `json:"mode"`
-		Category      bool   `json:"category"`
-		Demand        []int  `json:"demand"`
-		WKL           string `json:"wkl"`
-		Configuration string `json:"configuration"`
-		Heuristic     string `json:"heuristic"`
+		Slo           int     `json:"slo"`
+		Price         float32 `json:"price"`
+		Size          int     `json:"instances"`
+		Mode          string  `json:"mode"`
+		Category      bool    `json:"category"`
+		Demand        []int   `json:"demand"`
+		WKL           string  `json:"wkl"`
+		Configuration string  `json:"configuration"`
+		Heuristic     string  `json:"heuristic"`
 	}
 
 	err := json.NewDecoder(r.Body).Decode(&config)
@@ -71,7 +71,7 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 		log.Println("ERROR: callCapacitorResource loanding vm types")
 		return
 	}
-	dspace := capacitor.NewDeploymentSpace(&vms, float32(price), size)
+	dspace := capacitor.NewDeploymentSpace(&vms, config.Price, config.Size)
 	m := capacitor.MockExecutor{"config/wordpress_cpu_mem.csv", nil}
 	err = m.Load()
 	if err != nil {

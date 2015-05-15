@@ -276,7 +276,7 @@
 							</div>
 							<div class="input-group">
 								<input type="text" class="form-control" id="price" placeholder="Price (e.g. 7.0)">
-								<input type="text" class="form-control" id="instance" placeholder="Instances (e.g. 4)">
+								<input type="text" class="form-control" id="instances" placeholder="Instances (e.g. 4)">
 							</span>
 							<div class="form-group">
 							  <select class="form-control" id="mode">
@@ -309,28 +309,21 @@
 									<option value="900">900</option>
 									<option value="1000">1000</option>
 								</select>
-							</div>
-                        </li>
-						<li class="sidebar-search">
-							<div class="input-group">
-								<span class="form-control">
-									<i class="fa fa-gamepad fa-fw" style="color:blue"></i>
-								</span>
-								<span class="input-group-addon">
-								Policy <input type="radio" name="heuristic" value="policy" checked>
-								Fast! <input type="radio" name="heuristic" value="sp">
-								BF <input type="radio" name="heuristic" value="bf">
-								</span>
-							</div>
-							<div class="form-group">
+
+								<label class="control-label" for="heuristic">Heuristic:</label>
+								<select class="form-control" id="heuristic" name="heuristic">
+									<option selected value="policy">Policy</option>
+									<option value="sp">Shortest Path!</option>
+									<option value="bf">Brutal Force!</option>
+								</select>
+
 								<label class="control-label" for="workload_approach">Workload:</label>
 								<select class="form-control" id="workload_approach" name="workload_approach">
 								<option selected="selected" value="optimistic">optimistic</option>
 								<option value="conservative">conservative</option>
 								<option value="pessimistic">pessimistic</option>
 								</select>
-							</div>
-							<div class="form-group">
+
 								<label class="control-label" for="configuration_approach">Configuration:</label>
 								<select class="form-control" id="configuration_approach" name="configuration_approach">
 								<option selected="selected" value="optimistic">optimistic</option>
@@ -408,8 +401,8 @@
                                     <i class="fa fa-support fa-5x"></i>
                                 </div>
                                 <div class="col-xs-9 text-right">
-                                    <div class="huge">13</div>
-                                    <div>Support Tickets!</div>
+                                    <div class="huge"></div>
+                                    <div></div>
                                 </div>
                             </div>
                         </div>                        
@@ -512,6 +505,16 @@
     <!-- Custom Theme JavaScript -->
     <script src="../js/sb-admin-2.js"></script>
 	<script>
+
+	$( "#heuristic" ).change(function() {
+		if ('policy' == $(this).val()){
+			$( "#workload_approach" ).removeAttr('disabled');
+                        $( "#configuration_approach" ).removeAttr('disabled');
+		}else{
+			$( "#workload_approach" ).attr('disabled', 'disabled');
+			$( "#configuration_approach" ).attr('disabled', 'disabled');
+		}
+	});
 	
 	function highlightTableFlow(exec) {
 		tds = 'fullTrace'+exec
@@ -525,11 +528,27 @@
 		$('html,body').animate({scrollTop: aTag.offset().top},'slow');
 	}
 
+	function validateInputs(){
+		if ('' == $( "#slo" ).val()){
+			$( "#slo" ).val('20000');
+		}
+		if ('' == $( "#price" ).val()){
+			$( "#price" ).val('7.0');
+		}
+		if ('' == $( "#instances" ).val()){
+			$( "#instances" ).val('4');
+		}
+	}
+
 	$("#button_execute").click( 
 		function(){
-			data = '{"slo":' + $( "#slo" ).val() 
+			validateInputs();
+			
+			data = '{"slo":' + $( "#slo" ).val()
+			data = data + ', "price":'+$( "#price" ).val()
+			data = data + ', "instances":'+$( "#instances" ).val()
 			data = data + ', "mode":"'+$( "#mode" ).val()+'"'
-			data = data + ', "heuristic":"'+$( 'input[name=heuristic]:checked' ).val()+'"'
+			data = data + ', "heuristic":"'+$( '#heuristic' ).val()+'"'
 			data = data + ', "category":'+$( 'input[name=category]:checked' ).val()
 			data = data + ', "demand":['+$( '#demand' ).val()+']'
 			data = data + ', "wkl":"'+$( "#workload_approach" ).val()+'"'
