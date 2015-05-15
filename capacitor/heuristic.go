@@ -115,6 +115,7 @@ func (h *ShortestPath) Exec(mode string, slo float32, wkls []string) (path ExecI
 					} else {
 						dspaceInfo[cat] = *localNodesInfo
 						bestKey = key
+						bestNodesInfo = *localNodesInfo
 						break
 					}
 				}
