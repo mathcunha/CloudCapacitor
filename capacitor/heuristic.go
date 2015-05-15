@@ -2,8 +2,8 @@ package capacitor
 
 import (
 	"fmt"
-	"github.com/mathcunha/CloudCapacitor/sync2"
 	"log"
+	"math"
 	"sort"
 	"strings"
 )
@@ -17,7 +17,6 @@ const (
 type ExecInfo struct {
 	Execs int
 	Path  string
-	It    int
 }
 
 type NodeExec struct {
@@ -36,10 +35,7 @@ type BrutalForce struct {
 
 //Find the shortest path to Mark all configurations and workloads
 type ShortestPath struct {
-	c     *Capacitor
-	slo   float32
-	it    int
-	maxIt int
+	c *Capacitor
 }
 
 //the policies proposed at thesis
@@ -64,8 +60,12 @@ func NewPolicy(c *Capacitor, levelPolicy string, wklPolicy string) (h *Policy) {
 }
 
 func NewShortestPath(c *Capacitor) (h *ShortestPath) {
-	h = new(ShortestPath)
-	h.c = c
+	h = &ShortestPath{c}
+	return
+}
+
+func NewBrutalForce(c *Capacitor) (h *BrutalForce) {
+	h = &BrutalForce{c}
 	return
 }
 
@@ -82,23 +82,55 @@ func (bf *BrutalForce) Exec(mode string, slo float32, wkls []string) (path ExecI
 		}
 	}
 	//TODO
-	return ExecInfo{0, "", 0}, make(map[string]NodesInfo)
+	return ExecInfo{0, ""}, make(map[string]NodesInfo)
 }
 
 func (h *ShortestPath) Exec(mode string, slo float32, wkls []string) (path ExecInfo, dspaceInfo map[string]NodesInfo) {
-	mapa := h.c.Dspace.CapacityBy(mode)
-	h.slo = slo
-	for _, nodes := range *mapa {
-		h.ExecCategory(wkls, nodes)
+	dspace := h.c.Dspace.CapacityBy(mode)
+	execInfo := ExecInfo{0, ""}
+
+	//map to store the results by category
+	dspaceInfo = make(map[string]NodesInfo)
+
+	for _, cat := range h.c.Dspace.Categories() {
+		nodes := (*dspace)[cat]
+		nodesInfo := buildMatrix(wkls, nodes)
+
+		for h.c.HasMore(&nodesInfo) {
+			execInfo.Execs++
+			bestKey := ""
+			var bestNodesInfo NodesInfo
+			nodesLeft := math.MaxInt32
+			for key, node := range nodesInfo.Matrix {
+				if !(node.When != -1) {
+					localNodesInfo := nodesInfo.Clone()
+					result := h.c.Executor.Execute(*node.Config, node.WKL)
+					localNodesInfo.Mark(key, result.SLO <= slo, execInfo.Execs)
+					if localNodesLeft := h.c.NodesLeft(localNodesInfo); localNodesLeft != 0 {
+						if nodesLeft > localNodesLeft {
+							nodesLeft = localNodesLeft
+							bestNodesInfo = *localNodesInfo
+							bestKey = key
+						}
+					} else {
+						dspaceInfo[cat] = *localNodesInfo
+						bestKey = key
+						break
+					}
+				}
+			}
+			nodesInfo = bestNodesInfo
+			execInfo.Path = fmt.Sprintf("%v%v->", execInfo.Path, bestKey)
+		}
 	}
-	//TODO
-	return ExecInfo{0, "", 0}, make(map[string]NodesInfo)
+
+	return execInfo, dspaceInfo
 }
 
 func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, dspaceInfo map[string]NodesInfo) {
 	dspace := h.c.Dspace.CapacityBy(mode)
 
-	execInfo := ExecInfo{0, "", 0}
+	execInfo := ExecInfo{0, ""}
 
 	//map to store the results by category
 	dspaceInfo = make(map[string]NodesInfo)
@@ -277,38 +309,6 @@ func (p *Policy) buildCapacityLevelList(key string, nodesInfo *NodesInfo, nodes 
 	return
 }
 
-func (h *ShortestPath) ExecCategory(wkls []string, nodes Nodes) {
-	numConfigs := len(nodes)
-	h.maxIt = len(wkls) * numConfigs
-
-	nexts := []NodeExec{NodeExec{buildMatrix(wkls, nodes), ExecInfo{0, "", 0}}}
-
-	for i := 0; i <= h.maxIt; i++ {
-		wg := sync2.NewBlockWaitGroup(100000)
-		chBest := make(chan ExecInfo)
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			nexts = h.findShortestPath(nexts, wg, chBest, h.maxIt)
-		}()
-
-		go func() {
-			wg.Wait()
-			close(chBest)
-		}()
-
-		best := h.GetBest(chBest)
-
-		if best.Execs != -1 {
-			PrintExecPath(best, wkls, nodes)
-			return
-		}
-
-	}
-
-}
-
 func PrintExecPath(winner ExecInfo, wkls []string, nodes Nodes) {
 	path := strings.Split(winner.Path, "->")
 	str := ""
@@ -323,59 +323,4 @@ func PrintExecPath(winner ExecInfo, wkls []string, nodes Nodes) {
 	}
 	str = fmt.Sprintf("%vTotal Execs:%v", str, execs)
 	log.Printf(str)
-}
-
-func (h *ShortestPath) findShortestPath(current []NodeExec, wg *sync2.BlockWaitGroup, chBest chan ExecInfo, numConfigs int) (nexts []NodeExec) {
-	nexts = *(new([]NodeExec))
-	lessNodes := numConfigs
-	for _, ex := range current {
-		for key, node := range ex.nodes.Matrix {
-			if !(node.When != -1) {
-				cNodes := ex.nodes.Clone()
-				nExecs := ex.Execs
-				var result Result
-				if conf := node.Config; conf != nil {
-					nExecs = nExecs + 1
-					result = h.c.Executor.Execute(*conf, node.WKL)
-					cNodes.Mark(key, result.SLO <= h.slo, nExecs)
-
-				}
-				nPath := fmt.Sprintf("%v%v->", ex.Path, key)
-
-				if nodesLeft := h.c.NodesLeft(cNodes); nodesLeft != 0 {
-					if lessNodes == nodesLeft {
-						nexts = append(nexts, NodeExec{*cNodes, ExecInfo{nExecs, nPath, ex.It + 1}})
-					}
-					if lessNodes > nodesLeft {
-						lessNodes = nodesLeft
-						nexts = []NodeExec{NodeExec{*cNodes, ExecInfo{nExecs, nPath, ex.It + 1}}}
-					}
-				} else {
-					//All executions!
-					wg.Add(1)
-					go func() {
-						defer wg.Done()
-						chBest <- ExecInfo{nExecs, nPath, -1}
-					}()
-					//return nil
-				}
-			}
-		}
-	}
-
-	return nexts
-}
-
-func (h *ShortestPath) GetBest(chBest chan ExecInfo) (best ExecInfo) {
-	best = ExecInfo{-1, "", -1}
-	for {
-		execInfo, more := <-chBest
-		if more {
-			best = execInfo
-		} else {
-			break
-		}
-	}
-
-	return best
 }

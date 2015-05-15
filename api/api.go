@@ -56,6 +56,7 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 		Demand        []int  `json:"demand"`
 		WKL           string `json:"wkl"`
 		Configuration string `json:"configuration"`
+		Heuristic     string `json:"heuristic"`
 	}
 
 	err := json.NewDecoder(r.Body).Decode(&config)
@@ -79,7 +80,15 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 	}
 
 	c := capacitor.Capacitor{dspace, m}
-	h := capacitor.NewPolicy(&c, config.Configuration, config.WKL)
+	var h capacitor.Heuristic
+	switch config.Heuristic {
+	case "bf":
+		h = capacitor.NewBrutalForce(&c)
+	case "sp":
+		h = capacitor.NewShortestPath(&c)
+	default:
+		h = capacitor.NewPolicy(&c, config.Configuration, config.WKL)
+	}
 
 	wkls := make([]string, len(config.Demand), len(config.Demand))
 	for i, d := range config.Demand {

@@ -274,6 +274,10 @@
 								<button class="btn btn-default" type="button" id="button_execute">Execute</button>
 							  </span>
 							</div>
+							<div class="input-group">
+								<input type="text" class="form-control" id="price" placeholder="Price (e.g. 7.0)">
+								<input type="text" class="form-control" id="instance" placeholder="Instances (e.g. 4)">
+							</span>
 							<div class="form-group">
 							  <select class="form-control" id="mode">
 								<option value="Strict">capacity</option>
@@ -308,6 +312,16 @@
 							</div>
                         </li>
 						<li class="sidebar-search">
+							<div class="input-group">
+								<span class="form-control">
+									<i class="fa fa-gamepad fa-fw" style="color:blue"></i>
+								</span>
+								<span class="input-group-addon">
+								Policy <input type="radio" name="heuristic" value="policy" checked>
+								Fast! <input type="radio" name="heuristic" value="sp">
+								BF <input type="radio" name="heuristic" value="bf">
+								</span>
+							</div>
 							<div class="form-group">
 								<label class="control-label" for="workload_approach">Workload:</label>
 								<select class="form-control" id="workload_approach" name="workload_approach">
@@ -515,6 +529,7 @@
 		function(){
 			data = '{"slo":' + $( "#slo" ).val() 
 			data = data + ', "mode":"'+$( "#mode" ).val()+'"'
+			data = data + ', "heuristic":"'+$( 'input[name=heuristic]:checked' ).val()+'"'
 			data = data + ', "category":'+$( 'input[name=category]:checked' ).val()
 			data = data + ', "demand":['+$( '#demand' ).val()+']'
 			data = data + ', "wkl":"'+$( "#workload_approach" ).val()+'"'
