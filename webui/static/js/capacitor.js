@@ -139,10 +139,10 @@
 					});
 					newTable = newTable + '</tbody></table>';
 					$( "#panelFullTrace" ).append(newTable);
+			      		showSuccessMessage('Done!')
 
 				}
 			      , "json" );
-
-			      showSuccessMessage('Done!')
+				//post end
 		 }
 	);
