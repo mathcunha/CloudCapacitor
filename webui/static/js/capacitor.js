@@ -60,8 +60,8 @@
 			$( "#instances" ).val('4');
 		}
 
-		if (('false' == $( 'input[name=category]:checked' ).val()) && ('policy' == $( '#heuristic' ).val())){
-			showWarningMessage('Heuristic policy requires Category true');
+		if (('false' == $( 'input[name=category]:checked' ).val()) && ('Strict' == $( '#mode' ).val())){
+			showWarningMessage('Mode capacity requires Category true');
 			return false
 		}
 		return true
