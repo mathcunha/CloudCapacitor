@@ -38,6 +38,12 @@ type ShortestPath struct {
 	c *Capacitor
 }
 
+//Explorer
+type ExplorePath struct {
+	c        *Capacitor
+	maxExecs int
+}
+
 //the policies proposed at thesis
 type Policy struct {
 	c           *Capacitor
@@ -66,6 +72,11 @@ func NewShortestPath(c *Capacitor) (h *ShortestPath) {
 
 func NewBrutalForce(c *Capacitor) (h *BrutalForce) {
 	h = &BrutalForce{c}
+	return
+}
+
+func NewExplorePath(c *Capacitor) (h *ExplorePath) {
+	h = &ExplorePath{c, 60}
 	return
 }
 
@@ -136,6 +147,50 @@ func (h *ShortestPath) Exec(mode string, slo float32, wkls []string) (path ExecI
 	}
 
 	return execInfo, dspaceInfo
+}
+
+func (h *ExplorePath) Exec(mode string, slo float32, wkls []string) (path ExecInfo, dspaceInfo map[string]NodesInfo) {
+	dspace := h.c.Dspace.CapacityBy(mode)
+	execInfo := ExecInfo{0, ""}
+
+	//map to store the results by category
+	dspaceInfo = make(map[string]NodesInfo)
+
+	for _, cat := range h.c.Dspace.Categories() {
+		nodes := (*dspace)[cat]
+		nodesInfo := buildMatrix(wkls, nodes)
+		for key, node := range nodesInfo.Matrix {
+			if localExecInfo, localNodesInfo := h.Explore(slo, wkls, node, key, nodesInfo.Clone(), execInfo); localExecInfo.Execs != -1 {
+				nodesInfo = *localNodesInfo
+				execInfo = localExecInfo
+				dspaceInfo[cat] = *localNodesInfo
+				break
+			}
+		}
+	}
+
+	return execInfo, dspaceInfo
+}
+
+func (h *ExplorePath) Explore(slo float32, wkls []string, nodeInfo *NodeInfo, key string, nodesInfo *NodesInfo, execInfo ExecInfo) (ExecInfo, *NodesInfo) {
+	execInfo.Execs++
+	execInfo.Path = fmt.Sprintf("%v%v->", execInfo.Path, key)
+	result := h.c.Executor.Execute(*nodeInfo.Config, nodeInfo.WKL)
+	nodesInfo.Mark(key, result.SLO <= slo, execInfo.Execs)
+	if h.c.HasMore(nodesInfo) {
+		if execInfo.Execs <= h.maxExecs {
+			for localKey, localNode := range nodesInfo.Matrix {
+				if localExecInfo, localNodesInfo := h.Explore(slo, wkls, localNode, localKey, nodesInfo.Clone(), ExecInfo{execInfo.Execs, execInfo.Path}); localExecInfo.Execs != -1 {
+					return localExecInfo, localNodesInfo
+				}
+			}
+		}
+	} else {
+		return execInfo, nodesInfo
+	}
+
+	//not finished
+	return ExecInfo{-1, ""}, nodesInfo
 }
 
 func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, dspaceInfo map[string]NodesInfo) {

@@ -87,6 +87,8 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 	c := capacitor.Capacitor{dspace, m}
 	var h capacitor.Heuristic
 	switch config.Heuristic {
+	case "e":
+		h = capacitor.NewExplorePath(&c)
 	case "bf":
 		h = capacitor.NewBrutalForce(&c)
 	case "sp":
