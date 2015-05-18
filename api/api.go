@@ -57,6 +57,7 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 		WKL           string  `json:"wkl"`
 		Configuration string  `json:"configuration"`
 		Heuristic     string  `json:"heuristic"`
+		MaxExecs      int     `json:"maxExecs"`
 	}
 
 	err := json.NewDecoder(r.Body).Decode(&config)
@@ -88,7 +89,7 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 	var h capacitor.Heuristic
 	switch config.Heuristic {
 	case "e":
-		h = capacitor.NewExplorePath(&c)
+		h = capacitor.NewExplorePath(&c, config.MaxExecs)
 	case "bf":
 		h = capacitor.NewBrutalForce(&c)
 	case "sp":
@@ -105,7 +106,11 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 	execInfo, dspaceInfo := h.Exec(config.Mode, float32(config.Slo), wkls)
 
 	str := ExecPathSummary(execInfo, wkls, config.Mode, &c)
-	str = fmt.Sprintf("%v, \"spaceInfo\":%v}", str[0:len(str)-1], DeploymentSpace(execInfo, wkls, config.Mode, &c, dspaceInfo, m, float32(config.Slo)))
+	if strDeployment := DeploymentSpace(execInfo, wkls, config.Mode, &c, dspaceInfo, m, float32(config.Slo)); len(strDeployment) > 1 {
+		str = fmt.Sprintf("%v, \"spaceInfo\":%v}", str[0:len(str)-1], strDeployment)
+	} else {
+		str = fmt.Sprintf("%v, \"spaceInfo\":[]}", str[0:len(str)-1])
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Fprintf(w, "%v", str)
@@ -172,6 +177,10 @@ func ExecPathSummary(winner capacitor.ExecInfo, wkls []string, mode string, c *c
 		}
 	}
 	//one extra comma
-	str = fmt.Sprintf("{\"execs\":%v, \"price\":%.2f, \"path\":%v]}", execs, price, str[0:len(str)-1])
+	if len(str) > 1 {
+		str = fmt.Sprintf("{\"execs\":%v, \"price\":%.2f, \"path\":%v]}", execs, price, str[0:len(str)-1])
+	} else {
+		str = fmt.Sprintf("{\"execs\":%v, \"price\":%.2f, \"path\":[]}", execs, price)
+	}
 	return str
 }

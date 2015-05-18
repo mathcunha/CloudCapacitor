@@ -6,6 +6,11 @@
 			$( "#workload_approach" ).attr('disabled', 'disabled');
 			$( "#configuration_approach" ).attr('disabled', 'disabled');
 		}
+		if ('e' == $(this).val()){
+			$( "#maxExecs" ).removeAttr('disabled');
+		}else{
+			$( "#maxExecs" ).attr('disabled', 'disabled');
+		}
 	});
 
         function closeAlertPanel(css){
@@ -80,6 +85,9 @@
 			data = data + ', "heuristic":"'+$( '#heuristic' ).val()+'"'
 			data = data + ', "category":'+$( 'input[name=category]:checked' ).val()
 			data = data + ', "demand":['+$( '#demand' ).val()+']'
+		        if ($( "#maxExecs" ).val() != ''){
+				data = data + ', "maxExecs":'+$( '#maxExecs' ).val()
+			}
 			data = data + ', "wkl":"'+$( "#workload_approach" ).val()+'"'
 			data = data + ', "configuration":"'+$( "#configuration_approach" ).val()+'"}'
 

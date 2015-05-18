@@ -75,8 +75,8 @@ func NewBrutalForce(c *Capacitor) (h *BrutalForce) {
 	return
 }
 
-func NewExplorePath(c *Capacitor) (h *ExplorePath) {
-	h = &ExplorePath{c, 60}
+func NewExplorePath(c *Capacitor, maxExecs int) (h *ExplorePath) {
+	h = &ExplorePath{c, maxExecs}
 	return
 }
 
@@ -151,36 +151,39 @@ func (h *ShortestPath) Exec(mode string, slo float32, wkls []string) (path ExecI
 
 func (h *ExplorePath) Exec(mode string, slo float32, wkls []string) (path ExecInfo, dspaceInfo map[string]NodesInfo) {
 	dspace := h.c.Dspace.CapacityBy(mode)
-	execInfo := ExecInfo{0, ""}
-
 	//map to store the results by category
 	dspaceInfo = make(map[string]NodesInfo)
+	execInfo := ExecInfo{0, ""}
 
 	for _, cat := range h.c.Dspace.Categories() {
 		nodes := (*dspace)[cat]
 		nodesInfo := buildMatrix(wkls, nodes)
-		for key, node := range nodesInfo.Matrix {
-			if localExecInfo, localNodesInfo := h.Explore(slo, wkls, node, key, nodesInfo.Clone(), execInfo); localExecInfo.Execs != -1 {
-				nodesInfo = *localNodesInfo
-				execInfo = localExecInfo
-				dspaceInfo[cat] = *localNodesInfo
-				break
+		for i := 1; i <= h.maxExecs; i++ {
+			for key, _ := range nodesInfo.Matrix {
+				if localExecInfo, localNodesInfo := h.Explore(slo, key, nodesInfo.Clone(), ExecInfo{execInfo.Execs, execInfo.Path}, i); localExecInfo.Execs != -1 {
+					dspaceInfo[cat] = *localNodesInfo
+					execInfo = localExecInfo
+					i = h.maxExecs + 1
+					break
+				}
 			}
 		}
+
 	}
 
 	return execInfo, dspaceInfo
 }
 
-func (h *ExplorePath) Explore(slo float32, wkls []string, nodeInfo *NodeInfo, key string, nodesInfo *NodesInfo, execInfo ExecInfo) (ExecInfo, *NodesInfo) {
+func (h *ExplorePath) Explore(slo float32, key string, nodesInfo *NodesInfo, execInfo ExecInfo, maxExecs int) (ExecInfo, *NodesInfo) {
 	execInfo.Execs++
 	execInfo.Path = fmt.Sprintf("%v%v->", execInfo.Path, key)
+	nodeInfo := nodesInfo.Matrix[key]
 	result := h.c.Executor.Execute(*nodeInfo.Config, nodeInfo.WKL)
 	nodesInfo.Mark(key, result.SLO <= slo, execInfo.Execs)
 	if h.c.HasMore(nodesInfo) {
-		if execInfo.Execs <= h.maxExecs {
-			for localKey, localNode := range nodesInfo.Matrix {
-				if localExecInfo, localNodesInfo := h.Explore(slo, wkls, localNode, localKey, nodesInfo.Clone(), ExecInfo{execInfo.Execs, execInfo.Path}); localExecInfo.Execs != -1 {
+		if execInfo.Execs < maxExecs {
+			for localKey, _ := range nodesInfo.Matrix {
+				if localExecInfo, localNodesInfo := h.Explore(slo, localKey, nodesInfo.Clone(), ExecInfo{execInfo.Execs, execInfo.Path}, maxExecs); localExecInfo.Execs != -1 {
 					return localExecInfo, localNodesInfo
 				}
 			}
