@@ -113,7 +113,7 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 		str = fmt.Sprintf("%v, \"spaceInfo\":[]}", str[0:len(str)-1])
 	}
 
-	str = fmt.Sprintf("%v,%v}", str[0:len(str)-1], ExecsByKey(execInfo, &c, dspaceInfo))
+	str = fmt.Sprintf("%v,%v}", str[0:len(str)-1], ExecsByKey(execInfo, &c, dspaceInfo, wkls))
 
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Fprintf(w, "%v", str)
@@ -230,9 +230,14 @@ func ExecPathSummary(winner capacitor.ExecInfo, wkls []string, mode string, c *c
 	return str
 }
 
-func ExecsByKey(winner capacitor.ExecInfo, c *capacitor.Capacitor, dspaceInfo map[string]capacitor.NodesInfo) (str string) {
+func ExecsByKey(winner capacitor.ExecInfo, c *capacitor.Capacitor, dspaceInfo map[string]capacitor.NodesInfo, wkls []string) (str string) {
 	path := strings.Split(winner.Path, "->")
 	execsByKey := make([]int, len(path), len(path))
+
+	//initializing
+	for i, _ := range execsByKey {
+		execsByKey[i] = -1
+	}
 
 	for _, cat := range c.Dspace.Categories() {
 		nodesInfo := dspaceInfo[cat]
@@ -244,9 +249,11 @@ func ExecsByKey(winner capacitor.ExecInfo, c *capacitor.Capacitor, dspaceInfo ma
 	str = "["
 
 	for i, key := range path {
-		ID, _ := capacitor.SplitMatrixKey(key)
+		ID, iWKL := capacitor.SplitMatrixKey(key)
 		if key != "" {
-			str = fmt.Sprintf("%v{\"key\":\"%v\", \"execs\":%v},", str, ID, execsByKey[i+1])
+			if execsByKey[i+1] != 0 {
+				str = fmt.Sprintf("%v{\"key\":\"%v\", \"execs\":%v},", str, ID+"("+wkls[iWKL]+")", execsByKey[i+1])
+			}
 		}
 	}
 

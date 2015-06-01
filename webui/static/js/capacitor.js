@@ -24,24 +24,24 @@
 		var options = {
 			//'title':'Predictions by Configuration',
 			width:"90%",
-			height:600,
-			bar: {groupWidth: "95%"},
+			height:250,
 			legend: { position: "none" }
 
 		};
 
 		//Instantiate and draw our chart, passing in some options.
-		var chart = new google.visualization.BarChart(document.getElementById('morris-bar-chart'));
+		var chart = new google.charts.Bar(document.getElementById('morris-bar-chart'));
 		chart.draw(chartData, options);
 	}
 
 	function morrisChart(data){
 		new Morris.Bar({
-			element: 'morris-bar-chart',
+		    element: 'morris-bar-chart',
 		    data: data.execsByKey,
 		    xkey: 'key',
 		    ykeys: ['execs'],
 		    labels: ['Predictions'],
+		    //xLabelAngle: 75,
 		    hideHover: 'auto',
 		    resize: true
 		});
@@ -135,7 +135,8 @@
 					$( "#panelExecPath" ).empty();
 					$( "#morris-bar-chart" ).empty();
 
-					morrisChart(data)
+					morrisChart(data);
+					//googleChart(data);
 
 					var totalExec = 0
 					jQuery.each( data.path, function( i, val ) {
@@ -193,3 +194,4 @@
 				//post end
 		 }
 	);
+	//google.load("visualization", "1.1", {packages:["bar"]});
