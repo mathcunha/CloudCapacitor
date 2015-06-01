@@ -13,6 +13,40 @@
 		}
 	});
 
+        function googleChart(data){
+		var chartData = new google.visualization.DataTable();
+		chartData.addColumn('string', 'Configuration');
+		chartData.addColumn('number', 'Predictions');
+		jQuery.each( data.execsByKey, function( i, val ) {
+			//console.log(val)
+			chartData.addRow([val.key, val.execs]);
+			});
+		var options = {
+			//'title':'Predictions by Configuration',
+			width:"90%",
+			height:600,
+			bar: {groupWidth: "95%"},
+			legend: { position: "none" }
+
+		};
+
+		//Instantiate and draw our chart, passing in some options.
+		var chart = new google.visualization.BarChart(document.getElementById('morris-bar-chart'));
+		chart.draw(chartData, options);
+	}
+
+	function morrisChart(data){
+		new Morris.Bar({
+			element: 'morris-bar-chart',
+		    data: data.execsByKey,
+		    xkey: 'key',
+		    ykeys: ['execs'],
+		    labels: ['Predictions'],
+		    hideHover: 'auto',
+		    resize: true
+		});
+	}
+
         function closeAlertPanel(css){
 		$("#alert").hide();
 	}
@@ -101,15 +135,7 @@
 					$( "#panelExecPath" ).empty();
 					$( "#morris-bar-chart" ).empty();
 
-					new Morris.Bar({
-						element: 'morris-bar-chart', 
-					    data: data.execsByKey,
-					    xkey: 'key',
-					    ykeys: ['execs'],
-					    labels: ['Predictions'],
-					    hideHover: 'auto',
-					    resize: true
-					});
+					morrisChart(data)
 
 					var totalExec = 0
 					jQuery.each( data.path, function( i, val ) {
