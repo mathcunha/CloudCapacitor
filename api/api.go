@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/mathcunha/CloudCapacitor/capacitor"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -112,12 +113,52 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 		str = fmt.Sprintf("%v, \"spaceInfo\":[]}", str[0:len(str)-1])
 	}
 
+	str = fmt.Sprintf("%v,%v}", str[0:len(str)-1], ExecsByKey(execInfo, &c, dspaceInfo))
+
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Fprintf(w, "%v", str)
 }
 
+func CalcAccurary(tp int, fp int, fn int, node *capacitor.Node, wkl int, nodesInfo capacitor.NodesInfo, executor capacitor.Executor, slo float32) (int, int, int) {
+	key := capacitor.GetMatrixKey(node.ID, wkl)
+	nodeInfo := nodesInfo.Matrix[key]
+	result := executor.Execute(*node.Config, nodeInfo.WKL)
+	metSLO := result.SLO <= slo
+
+	if nodeInfo.Candidate && metSLO {
+		tp += 1
+	}
+
+	if nodeInfo.Candidate && !metSLO {
+		fp += 1
+	}
+
+	if nodeInfo.Reject && metSLO {
+		fn += 1
+	}
+
+	return tp, fp, fn
+
+}
+
+//http://en.wikipedia.org/wiki/Precision_and_recall
+func CalcFmeasure(tp int, fp int, fn int) (fmeasure float64) {
+	precision := float64(tp) / float64(tp+fp)
+	recall := float64(tp) / float64(tp+fn)
+
+	fmeasure = (2 * (precision * recall) / (precision + recall))
+
+	if math.IsNaN(fmeasure) {
+		log.Printf("tp:%v,fp:%v,fn:%v,precision:%v,recall:%v", tp, fp, fn, precision, recall)
+		return 0
+	}
+
+	return
+}
+
 func DeploymentSpace(winner capacitor.ExecInfo, wkls []string, mode string, c *capacitor.Capacitor, dspaceInfo map[string]capacitor.NodesInfo, executor capacitor.Executor, slo float32) (str string) {
 	nodeMap := *c.Dspace.CapacityBy(mode)
+	tp, fp, fn := 0, 0, 0
 
 	str = "["
 	for _, cat := range c.Dspace.Categories() {
@@ -127,15 +168,19 @@ func DeploymentSpace(winner capacitor.ExecInfo, wkls []string, mode string, c *c
 			node := nodes.NodeByLevel(level)
 			for wkl := 0; wkl < nodesInfo.Workloads; wkl++ {
 				str = fmt.Sprintf("%v%v", str, PrintNodeExecInfo(node, wkl, nodesInfo, executor, slo))
+				tp, fp, fn = CalcAccurary(tp, fp, fn, node, wkl, nodesInfo, executor, slo)
 			}
 			for _, e := range nodes.Equivalents(node) {
 				for wkl := 0; wkl < nodesInfo.Workloads; wkl++ {
 					str = fmt.Sprintf("%v%v", str, PrintNodeExecInfo(e, wkl, nodesInfo, executor, slo))
+					tp, fp, fn = CalcAccurary(tp, fp, fn, node, wkl, nodesInfo, executor, slo)
 				}
 			}
 		}
 	}
-	str = fmt.Sprintf("%v]", str[0:len(str)-1])
+	str = fmt.Sprintf("%v], \"fmeasure\":%.4f ", str[0:len(str)-1], CalcFmeasure(tp, fp, fn))
+
+	//log.Printf(str)
 	return
 }
 
@@ -183,4 +228,33 @@ func ExecPathSummary(winner capacitor.ExecInfo, wkls []string, mode string, c *c
 		str = fmt.Sprintf("{\"execs\":%v, \"price\":%.2f, \"path\":[]}", execs, price)
 	}
 	return str
+}
+
+func ExecsByKey(winner capacitor.ExecInfo, c *capacitor.Capacitor, dspaceInfo map[string]capacitor.NodesInfo) (str string) {
+	path := strings.Split(winner.Path, "->")
+	execsByKey := make([]int, len(path), len(path))
+
+	for _, cat := range c.Dspace.Categories() {
+		nodesInfo := dspaceInfo[cat]
+		for _, nodeInfo := range nodesInfo.Matrix {
+			execsByKey[nodeInfo.When]++
+		}
+	}
+
+	str = "["
+
+	for i, key := range path {
+		ID, _ := capacitor.SplitMatrixKey(key)
+		if key != "" {
+			str = fmt.Sprintf("%v{\"key\":\"%v\", \"execs\":%v},", str, ID, execsByKey[i+1])
+		}
+	}
+
+	if len(str) > 1 {
+		str = fmt.Sprintf("\"execsByKey\":%v]", str[0:len(str)-1])
+	} else {
+		str = "\"execsByKey\":[]"
+	}
+
+	return
 }

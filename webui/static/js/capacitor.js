@@ -97,7 +97,20 @@
 				function( data ) {
 					$( "#totalPrice" ).html(data.price)
 					$( "#totalExecs" ).html(data.execs)
+				        $( "#fMeasure" ).html(data.fmeasure)
 					$( "#panelExecPath" ).empty();
+					$( "#morris-bar-chart" ).empty();
+
+					new Morris.Bar({
+						element: 'morris-bar-chart', 
+					    data: data.execsByKey,
+					    xkey: 'key',
+					    ykeys: ['execs'],
+					    labels: ['Predictions'],
+					    hideHover: 'auto',
+					    resize: true
+					});
+
 					var totalExec = 0
 					jQuery.each( data.path, function( i, val ) {
 						totalExec = totalExec+1
