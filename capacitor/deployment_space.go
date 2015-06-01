@@ -27,6 +27,11 @@ type byCPU struct{ Configs }
 type byPrice struct{ Configs }
 type byStrict struct{ Configs }
 
+type bySize struct{ Nodes }
+
+func (s Nodes) Len() int      { return len(s) }
+func (s Nodes) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+
 func (s Configs) Len() int      { return len(s) }
 func (s Configs) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
@@ -34,6 +39,8 @@ func (s byMem) Less(i, j int) bool    { return s.Configs[i].Mem() < s.Configs[j]
 func (s byCPU) Less(i, j int) bool    { return s.Configs[i].CPU() < s.Configs[j].CPU() }
 func (s byPrice) Less(i, j int) bool  { return s.Configs[i].Price() < s.Configs[j].Price() }
 func (s byStrict) Less(i, j int) bool { return s.Configs[i].Strict() < s.Configs[j].Strict() }
+
+func (s bySize) Less(i, j int) bool { return s.Nodes[i].Config.Size < s.Nodes[j].Config.Size }
 
 func NewDeploymentSpace(vms *[]VM, price float32, size int) (dspace DeploymentSpace) {
 	mapa := make(map[string]Configs)
@@ -150,6 +157,7 @@ func (nodes *Nodes) Equivalents(n *Node) Nodes {
 			equivalents = append(equivalents, e)
 		}
 	}
+	sort.Sort(bySize{equivalents})
 	return equivalents
 }
 

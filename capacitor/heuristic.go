@@ -263,13 +263,31 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 			}
 
 			//next config
-			key = GetMatrixKey(nodes.NodeByLevel(level).ID, wkl)
-			nodeInfo = nodesInfo.Matrix[key]
+			key, nodeInfo = h.NextConfig(&nodesInfo, nodes, level, wkl)
 		}
 		//log.Printf("[Policy.Exec] Category:%v Execs:%v", cat, execInfo.execs)
 	}
 
 	return execInfo, dspaceInfo
+}
+
+func (p *Policy) NextConfig(nodesInfo *NodesInfo, nodes Nodes, level int, wkl int) (key string, nodeInfo *NodeInfo) {
+	key = GetMatrixKey(nodes.NodeByLevel(level).ID, wkl)
+	nodeInfo = nodesInfo.Matrix[key]
+
+	if nodeInfo != nil {
+		//it is ordered
+		equivalent := nodes.Equivalents((&nodeInfo.Node))
+		for _, node := range equivalent {
+			localKey := GetMatrixKey(node.ID, wkl)
+			localNodeInfo := nodesInfo.Matrix[localKey]
+			if localNodeInfo.Config.Size < nodeInfo.Config.Size {
+				nodeInfo = localNodeInfo
+				key = localKey
+			}
+		}
+	}
+	return
 }
 
 func HasMore(c *Capacitor, dspaceInfo map[string]NodesInfo) (hasMore bool) {
