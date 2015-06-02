@@ -47,27 +47,20 @@ func getPort() string {
 	return ":" + port
 }
 
-func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
+func drawDeploymentSpace(w http.ResponseWriter, r *http.Request) {
 	var config struct {
-		Slo           int     `json:"slo"`
-		Price         float32 `json:"price"`
-		Size          int     `json:"instances"`
-		Mode          string  `json:"mode"`
-		Category      bool    `json:"category"`
-		Demand        []int   `json:"demand"`
-		WKL           string  `json:"wkl"`
-		Configuration string  `json:"configuration"`
-		Heuristic     string  `json:"heuristic"`
-		MaxExecs      int     `json:"maxExecs"`
+		Slo      int     `json:"slo"`
+		Price    float32 `json:"price"`
+		Size     int     `json:"instances"`
+		Mode     string  `json:"mode"`
+		Category bool    `json:"category"`
 	}
-
 	err := json.NewDecoder(r.Body).Decode(&config)
 	r.Body.Close()
 	if err != nil {
-		log.Printf("ERROR: Parsing request body callCapacitorResource:%v", err)
+		log.Printf("ERROR: Parsing request body drawDeploymentSpace:%v", err)
 		return
 	}
-
 	file := "config/dspace.yml"
 	if !config.Category {
 		file = "config/dspace_nocat.yml"
@@ -75,48 +68,90 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 
 	vms, err := capacitor.LoadTypes(file)
 	if err != nil {
-		log.Println("ERROR: callCapacitorResource loanding vm types")
+		log.Println("ERROR: drawDeploymentSpace loanding vm types")
 		return
 	}
 	dspace := capacitor.NewDeploymentSpace(&vms, config.Price, config.Size)
-	m := capacitor.MockExecutor{"config/wordpress_cpu_mem.csv", nil}
-	err = m.Load()
-	if err != nil {
-		log.Println("ERROR: callCapacitorResource unable to start MockExecutor")
-		return
-	}
 
-	c := capacitor.Capacitor{dspace, m}
-	var h capacitor.Heuristic
-	switch config.Heuristic {
-	case "e":
-		h = capacitor.NewExplorePath(&c, config.MaxExecs)
-	case "bf":
-		h = capacitor.NewBrutalForce(&c)
-	case "sp":
-		h = capacitor.NewShortestPath(&c)
-	default:
-		h = capacitor.NewPolicy(&c, config.Configuration, config.WKL)
-	}
+	w.Header().Set("Content-Type", "text/plain")
+	fmt.Fprintf(w, "%v", capacitor.NodesToDOT(dspace.CapacityBy(config.Mode)))
+}
 
-	wkls := make([]string, len(config.Demand), len(config.Demand))
-	for i, d := range config.Demand {
-		wkls[i] = strconv.Itoa(d)
-	}
-
-	execInfo, dspaceInfo := h.Exec(config.Mode, float32(config.Slo), wkls)
-
-	str := ExecPathSummary(execInfo, wkls, config.Mode, &c)
-	if strDeployment := DeploymentSpace(config.Mode, &c, dspaceInfo, m, float32(config.Slo)); len(strDeployment) > 1 {
-		str = fmt.Sprintf("%v, \"spaceInfo\":%v}", str[0:len(str)-1], strDeployment)
+func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
+	a_path := strings.Split(r.URL.Path, "/")
+	if "draw" == a_path[4] {
+		drawDeploymentSpace(w, r)
 	} else {
-		str = fmt.Sprintf("%v, \"spaceInfo\":[]}", str[0:len(str)-1])
+		var config struct {
+			Slo           int     `json:"slo"`
+			Price         float32 `json:"price"`
+			Size          int     `json:"instances"`
+			Mode          string  `json:"mode"`
+			Category      bool    `json:"category"`
+			Demand        []int   `json:"demand"`
+			WKL           string  `json:"wkl"`
+			Configuration string  `json:"configuration"`
+			Heuristic     string  `json:"heuristic"`
+			MaxExecs      int     `json:"maxExecs"`
+		}
+
+		err := json.NewDecoder(r.Body).Decode(&config)
+		r.Body.Close()
+		if err != nil {
+			log.Printf("ERROR: Parsing request body callCapacitorResource:%v", err)
+			return
+		}
+
+		file := "config/dspace.yml"
+		if !config.Category {
+			file = "config/dspace_nocat.yml"
+		}
+
+		vms, err := capacitor.LoadTypes(file)
+		if err != nil {
+			log.Println("ERROR: callCapacitorResource loanding vm types")
+			return
+		}
+		dspace := capacitor.NewDeploymentSpace(&vms, config.Price, config.Size)
+		m := capacitor.MockExecutor{"config/wordpress_cpu_mem.csv", nil}
+		err = m.Load()
+		if err != nil {
+			log.Println("ERROR: callCapacitorResource unable to start MockExecutor")
+			return
+		}
+
+		c := capacitor.Capacitor{dspace, m}
+		var h capacitor.Heuristic
+		switch config.Heuristic {
+		case "e":
+			h = capacitor.NewExplorePath(&c, config.MaxExecs)
+		case "bf":
+			h = capacitor.NewBrutalForce(&c)
+		case "sp":
+			h = capacitor.NewShortestPath(&c)
+		default:
+			h = capacitor.NewPolicy(&c, config.Configuration, config.WKL)
+		}
+
+		wkls := make([]string, len(config.Demand), len(config.Demand))
+		for i, d := range config.Demand {
+			wkls[i] = strconv.Itoa(d)
+		}
+
+		execInfo, dspaceInfo := h.Exec(config.Mode, float32(config.Slo), wkls)
+
+		str := ExecPathSummary(execInfo, wkls, config.Mode, &c)
+		if strDeployment := DeploymentSpace(config.Mode, &c, dspaceInfo, m, float32(config.Slo)); len(strDeployment) > 1 {
+			str = fmt.Sprintf("%v, \"spaceInfo\":%v}", str[0:len(str)-1], strDeployment)
+		} else {
+			str = fmt.Sprintf("%v, \"spaceInfo\":[]}", str[0:len(str)-1])
+		}
+
+		str = fmt.Sprintf("%v,%v}", str[0:len(str)-1], ExecsByKey(execInfo, &c, dspaceInfo, wkls))
+
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, "%v", str)
 	}
-
-	str = fmt.Sprintf("%v,%v}", str[0:len(str)-1], ExecsByKey(execInfo, &c, dspaceInfo, wkls))
-
-	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, "%v", str)
 }
 
 func CalcAccurary(dspaceInfo map[string]capacitor.NodesInfo, executor capacitor.Executor, slo float32) (int, int, int) {

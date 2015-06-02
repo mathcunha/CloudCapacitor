@@ -284,6 +284,32 @@ func (nodes *Nodes) NodeByLevel(level int) (node *Node) {
 	return nil
 }
 
+func NodesToDOT(mapNodes *map[string]Nodes) (str string) {
+	colors := []string{"#FFCDD2", "#B2EBF2", "#C8E6C9", "#FFF9C4", "#E1BEE7", "#F0F4C3", "#D7CCC8", "#FFE0B2"}
+
+	str = "digraph g{\n"
+
+	for _, nodes := range *mapNodes {
+		for _, node := range nodes {
+			desc := fmt.Sprintf("%v (%v) [%v %v %v]", node.Config.Name, node.Config.Size, node.Config.CPU(), node.Config.Mem(), node.Config.Price())
+			str = fmt.Sprintf("%v\"%v\" [label=\"%v\",shape=box,fillcolor=\"%v\",style=\"filled,rounded\"];\n", str, node.ID, desc, colors[node.Level%8])
+			for _, lower := range node.Lower {
+				str = fmt.Sprintf("%v\"%v\" -> \"%v\";\n", str, node.ID, lower.ID)
+			}
+			/*for the sake of GraphViz beauty, this should be comment
+
+			for _, higher := range node.Higher {
+				str = fmt.Sprintf("%v\"%v\" -> \"%v\";\n", str, node.ID, higher.ID)
+			}
+			*/
+		}
+	}
+
+	str = fmt.Sprintf("%v}", str)
+	return
+
+}
+
 func printTree(mapa *map[string]Nodes) string {
 	str := ""
 	m := *mapa

@@ -88,6 +88,15 @@
 		$('html,body').animate({scrollTop: aTag.offset().top},'slow');
 	}
 
+	function downloadDeploymentSpace(){
+		$.post( "/api/v1/capacitor/draw", $( "#dspaceParam" ).val(),
+			function( data ) {
+				console.log(data)
+			}
+		, "text" );
+		//post end
+	}
+
 	function validateInputs(){
 		if ('' == $( "#slo" ).val()){
 			$( "#slo" ).val('20000');
@@ -126,12 +135,16 @@
 			data = data + ', "configuration":"'+$( "#configuration_approach" ).val()+'"}'
 
 			showSuccessMessage('Waiting reply...')
+
+			params = data
 			
-			$.post( "/api/v1/capacitor/", data, 
+			$.post( "/api/v1/capacitor/", params, 
 				function( data ) {
-					$( "#totalPrice" ).html(data.price)
-					$( "#totalExecs" ).html(data.execs)
-				        $( "#fMeasure" ).html(data.fmeasure)
+					$( "#totalPrice" ).html(data.price);
+					$( "#totalExecs" ).html(data.execs);
+				        $( "#fMeasure" ).html(data.fmeasure);
+					$( "#dspaceParam" ).val(params);
+				        $( "#dspace" ).html('<a href="javascript:downloadDeploymentSpace()" style="color:white"> get</a>');
 					$( "#panelExecPath" ).empty();
 					$( "#morris-bar-chart" ).empty();
 
