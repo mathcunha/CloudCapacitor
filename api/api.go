@@ -107,7 +107,7 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 	execInfo, dspaceInfo := h.Exec(config.Mode, float32(config.Slo), wkls)
 
 	str := ExecPathSummary(execInfo, wkls, config.Mode, &c)
-	if strDeployment := DeploymentSpace(execInfo, wkls, config.Mode, &c, dspaceInfo, m, float32(config.Slo)); len(strDeployment) > 1 {
+	if strDeployment := DeploymentSpace(config.Mode, &c, dspaceInfo, m, float32(config.Slo)); len(strDeployment) > 1 {
 		str = fmt.Sprintf("%v, \"spaceInfo\":%v}", str[0:len(str)-1], strDeployment)
 	} else {
 		str = fmt.Sprintf("%v, \"spaceInfo\":[]}", str[0:len(str)-1])
@@ -160,7 +160,7 @@ func CalcFmeasure(tp int, fp int, fn int) (fmeasure float64) {
 	return
 }
 
-func DeploymentSpace(winner capacitor.ExecInfo, wkls []string, mode string, c *capacitor.Capacitor, dspaceInfo map[string]capacitor.NodesInfo, executor capacitor.Executor, slo float32) (str string) {
+func DeploymentSpace(mode string, c *capacitor.Capacitor, dspaceInfo map[string]capacitor.NodesInfo, executor capacitor.Executor, slo float32) (str string) {
 	nodeMap := *c.Dspace.CapacityBy(mode)
 
 	str = "["
