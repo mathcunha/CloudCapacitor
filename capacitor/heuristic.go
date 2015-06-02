@@ -214,8 +214,7 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 
 		level := h.selectCapacityLevel(&nodesInfo, key, &nodes)
 		wkl := h.selectWorkload(&nodesInfo, key)
-		key = GetMatrixKey(nodes.NodeByLevel(level).ID, wkl)
-		nodeInfo := nodesInfo.Matrix[key]
+		key, nodeInfo := h.NextConfig(&nodesInfo, nodes, level, wkl)
 
 		//Process main loop, basically there will be no blank space
 		for h.c.HasMore(&nodesInfo) {
@@ -278,12 +277,11 @@ func (p *Policy) NextConfig(nodesInfo *NodesInfo, nodes Nodes, level int, wkl in
 	if nodeInfo != nil {
 		//it is ordered
 		equivalent := nodes.Equivalents((&nodeInfo.Node))
-		for _, node := range equivalent {
-			localKey := GetMatrixKey(node.ID, wkl)
-			localNodeInfo := nodesInfo.Matrix[localKey]
-			if localNodeInfo.Config.Size < nodeInfo.Config.Size {
-				nodeInfo = localNodeInfo
-				key = localKey
+		if len(equivalent) > 0 {
+			node := equivalent[0]
+			if node.Config.Size < nodeInfo.Config.Size {
+				key = GetMatrixKey(node.ID, wkl)
+				nodeInfo = nodesInfo.Matrix[key]
 			}
 		}
 	}

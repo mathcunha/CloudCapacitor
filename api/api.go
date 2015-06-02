@@ -119,22 +119,26 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "%v", str)
 }
 
-func CalcAccurary(tp int, fp int, fn int, node *capacitor.Node, wkl int, nodesInfo capacitor.NodesInfo, executor capacitor.Executor, slo float32) (int, int, int) {
-	key := capacitor.GetMatrixKey(node.ID, wkl)
-	nodeInfo := nodesInfo.Matrix[key]
-	result := executor.Execute(*node.Config, nodeInfo.WKL)
-	metSLO := result.SLO <= slo
+func CalcAccurary(dspaceInfo map[string]capacitor.NodesInfo, executor capacitor.Executor, slo float32) (int, int, int) {
+	tp, fp, fn := 0, 0, 0
 
-	if nodeInfo.Candidate && metSLO {
-		tp += 1
-	}
+	for _, nodesInfo := range dspaceInfo {
+		for _, nodeInfo := range nodesInfo.Matrix {
+			result := executor.Execute(*nodeInfo.Node.Config, nodeInfo.WKL)
+			metSLO := result.SLO <= slo
 
-	if nodeInfo.Candidate && !metSLO {
-		fp += 1
-	}
+			if nodeInfo.Candidate && metSLO {
+				tp += 1
+			}
 
-	if nodeInfo.Reject && metSLO {
-		fn += 1
+			if nodeInfo.Candidate && !metSLO {
+				fp += 1
+			}
+
+			if nodeInfo.Reject && metSLO {
+				fn += 1
+			}
+		}
 	}
 
 	return tp, fp, fn
@@ -158,7 +162,6 @@ func CalcFmeasure(tp int, fp int, fn int) (fmeasure float64) {
 
 func DeploymentSpace(winner capacitor.ExecInfo, wkls []string, mode string, c *capacitor.Capacitor, dspaceInfo map[string]capacitor.NodesInfo, executor capacitor.Executor, slo float32) (str string) {
 	nodeMap := *c.Dspace.CapacityBy(mode)
-	tp, fp, fn := 0, 0, 0
 
 	str = "["
 	for _, cat := range c.Dspace.Categories() {
@@ -168,17 +171,15 @@ func DeploymentSpace(winner capacitor.ExecInfo, wkls []string, mode string, c *c
 			node := nodes.NodeByLevel(level)
 			for wkl := 0; wkl < nodesInfo.Workloads; wkl++ {
 				str = fmt.Sprintf("%v%v", str, PrintNodeExecInfo(node, wkl, nodesInfo, executor, slo))
-				tp, fp, fn = CalcAccurary(tp, fp, fn, node, wkl, nodesInfo, executor, slo)
 			}
 			for _, e := range nodes.Equivalents(node) {
 				for wkl := 0; wkl < nodesInfo.Workloads; wkl++ {
 					str = fmt.Sprintf("%v%v", str, PrintNodeExecInfo(e, wkl, nodesInfo, executor, slo))
-					tp, fp, fn = CalcAccurary(tp, fp, fn, node, wkl, nodesInfo, executor, slo)
 				}
 			}
 		}
 	}
-	str = fmt.Sprintf("%v], \"fmeasure\":%.4f ", str[0:len(str)-1], CalcFmeasure(tp, fp, fn))
+	str = fmt.Sprintf("%v], \"fmeasure\":%.4f ", str[0:len(str)-1], CalcFmeasure(CalcAccurary(dspaceInfo, executor, slo)))
 
 	//log.Printf(str)
 	return
