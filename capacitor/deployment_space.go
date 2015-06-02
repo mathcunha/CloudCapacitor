@@ -2,6 +2,7 @@ package capacitor
 
 import (
 	"fmt"
+	"log"
 	"reflect"
 	"sort"
 )
@@ -176,7 +177,7 @@ func (dspace *DeploymentSpace) buildNodes(prop string) *map[string]Nodes {
 				v = reflect.ValueOf(c).MethodByName(prop).Call(nil)
 			} else {
 				value := reflect.ValueOf(c).MethodByName(prop).Call(nil)
-				if !equalID(v[0], value[0]) {
+				if !diffID(v[0], value[0]) {
 					level++
 					v = value
 				}
@@ -212,10 +213,12 @@ func (dspace *DeploymentSpace) buildNodes(prop string) *map[string]Nodes {
 	return &mapa
 }
 
-func equalID(x reflect.Value, y reflect.Value) (equal bool) {
+//Not only equals, but with a diff between -0.001 and 0.001
+func diffID(x reflect.Value, y reflect.Value) (equal bool) {
 	switch y.Kind() {
 	case reflect.Float32:
-		return x.Float() == y.Float()
+		diff := x.Float() - y.Float()
+		return diff <= 0.001 && diff >= -0.001
 	}
 
 	return false
@@ -287,21 +290,41 @@ func (nodes *Nodes) NodeByLevel(level int) (node *Node) {
 func NodesToDOT(mapNodes *map[string]Nodes) (str string) {
 	colors := []string{"#FFCDD2", "#B2EBF2", "#C8E6C9", "#FFF9C4", "#E1BEE7", "#F0F4C3", "#D7CCC8", "#FFE0B2"}
 
-	str = "digraph g{\n"
+	str = "graph g{\n"
+
+	edges := make(map[string]*[2]bool)
 
 	for _, nodes := range *mapNodes {
 		for _, node := range nodes {
 			desc := fmt.Sprintf("%v (%v) [%v %v %v]", node.Config.Name, node.Config.Size, node.Config.CPU(), node.Config.Mem(), node.Config.Price())
 			str = fmt.Sprintf("%v\"%v\" [label=\"%v\",shape=box,fillcolor=\"%v\",style=\"filled,rounded\"];\n", str, node.ID, desc, colors[node.Level%8])
-			for _, lower := range node.Lower {
-				str = fmt.Sprintf("%v\"%v\" -> \"%v\";\n", str, node.ID, lower.ID)
-			}
-			/*for the sake of GraphViz beauty, this should be comment
 
-			for _, higher := range node.Higher {
-				str = fmt.Sprintf("%v\"%v\" -> \"%v\";\n", str, node.ID, higher.ID)
+			for _, lower := range node.Lower {
+				key := fmt.Sprintf("\"%v\" -- \"%v\")", node.ID, lower.ID)
+				if v, has := edges[key]; has {
+					v[0] = true
+				} else {
+					edges[key] = &[2]bool{true, false}
+				}
 			}
-			*/
+			for _, higher := range node.Higher {
+				key := fmt.Sprintf("\"%v\" -- \"%v\")", higher.ID, node.ID)
+				if v, has := edges[key]; has {
+					v[1] = true
+				} else {
+					edges[key] = &[2]bool{false, true}
+				}
+			}
+		}
+	}
+
+	//the edges must exists from higher to lower and vice versa.
+	//I could have used a bigraph, but the drawing sucks
+	for key, v := range edges {
+		if v[0] == v[1] {
+			str = fmt.Sprintf("%v%v;\n", str, key)
+		} else {
+			log.Printf("ERROR: this key %v has must have two edges", key)
 		}
 	}
 

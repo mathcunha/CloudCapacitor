@@ -256,7 +256,7 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 					level = h.selectCapacityLevel(&nodesInfo, localKey, &nodes)
 					wkl = h.selectWorkload(&nodesInfo, localKey)
 				} else if h.c.HasMore(&nodesInfo) {
-					log.Fatalf("[Policy.Exec] Starting Point \n:%v\n%v", nodesInfo, nodes)
+					log.Printf("ERROR: [Policy.Exec] Starting Point \n:%v\n%v", nodesInfo, nodes)
 					break
 				}
 			}

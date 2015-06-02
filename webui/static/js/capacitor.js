@@ -91,10 +91,12 @@
 	function downloadDeploymentSpace(){
 		$.post( "/api/v1/capacitor/draw", $( "#dspaceParam" ).val(),
 			function( data ) {
-				console.log(data)
+				panel = '<div class=\"alert alert-info alert-dismissible\" role=\"alert\"><button type=\"button\" class=\"close\" data-dismiss=\"alert\" aria-label=\"Close\"><span aria-hidden=\"true\">&times;</span></button><pre>';
+				panel = panel + data
+				panel = panel + '</pre></div>'
+				$("#mainAlertPanel").append(panel);
 			}
 		, "text" );
-		//post end
 	}
 
 	function validateInputs(){
