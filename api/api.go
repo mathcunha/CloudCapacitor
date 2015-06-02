@@ -287,9 +287,7 @@ func ExecsByKey(winner capacitor.ExecInfo, c *capacitor.Capacitor, dspaceInfo ma
 	for i, key := range path {
 		ID, iWKL := capacitor.SplitMatrixKey(key)
 		if key != "" {
-			if execsByKey[i+1] != 0 {
-				str = fmt.Sprintf("%v{\"key\":\"%v\", \"execs\":%v},", str, ID+"("+wkls[iWKL]+")", execsByKey[i+1])
-			}
+			str = fmt.Sprintf("%v{\"key\":\"%v\", \"execs\":%v},", str, ID+"("+wkls[iWKL]+")", execsByKey[i+1])
 		}
 	}
 

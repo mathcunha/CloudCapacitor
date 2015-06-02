@@ -91,9 +91,18 @@
 	function downloadDeploymentSpace(){
 		$.post( "/api/v1/capacitor/draw", $( "#dspaceParam" ).val(),
 			function( data ) {
-				panel = '<div class=\"alert alert-info alert-dismissible\" role=\"alert\"><button type=\"button\" class=\"close\" data-dismiss=\"alert\" aria-label=\"Close\"><span aria-hidden=\"true\">&times;</span></button><pre>';
-				panel = panel + data
-				panel = panel + '</pre></div>'
+				graph = data.replace(new RegExp("#", 'g'), "%23")
+				if (graph.length <= 2800){
+
+				panel = '<div class=\"alert alert-info alert-dismissible\" role=\"alert\"><button type=\"button\" class=\"close\" data-dismiss=\"alert\" aria-label=\"Close\"><span aria-hidden=\"true\">&times;</span></button><img src=\'http://g.gravizo.com/g?';
+				panel = panel + graph
+				panel = panel + '\'/></div>'
+				}
+				else{
+					panel = '<div class=\"alert alert-info alert-dismissible\" role=\"alert\"><button type=\"button\" class=\"close\" data-dismiss=\"alert\" aria-label=\"Close\"><span aria-hidden=\"true\">&times;</span></button><pre>';
+	                                panel = panel + data
+	                                panel = panel + '</pre></div>'
+				}
 				$("#mainAlertPanel").append(panel);
 			}
 		, "text" );
