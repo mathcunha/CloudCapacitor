@@ -88,6 +88,34 @@
 		$('html,body').animate({scrollTop: aTag.offset().top},'slow');
 	}
 
+	function downloadDeploymentSpaceNew(){
+		$.ajax({
+			type:"POST",
+		url: "http://graphviz-dev.appspot.com/create_preview",
+		data: {'engine':"dot", 'script': $( "#dspaceParam" ).val()},
+		timeout: 33000,
+		beforeSend: function(){
+		},
+		success: function(data,status){
+			if(data == 'ERROR'){
+				panel = '<div class=\"alert alert-info alert-dismissible\" role=\"alert\"><button type=\"button\" class=\"close\" data-dismiss=\"alert\" aria-label=\"Close\"><span aria-hidden=\"true\">&times;</span></button><pre>';
+                                panel = panel + data
+                                panel = panel + '</pre></div>'
+			}
+			else{
+				panel = '<div class=\"alert alert-info alert-dismissible\" role=\"alert\"><button type=\"button\" class=\"close\" data-dismiss=\"alert\" aria-label=\"Close\"><span aria-hidden=\"true\">&times;</span></button><img src=\'http://graphviz-dev.appspot.com/get_preview?id='+data;
+                                panel = panel + '\'/></div>'
+			}
+			$("#mainAlertPanel").append(panel);
+		},
+		error: function(req,status){
+			console.log(req)
+		},
+		complete: function(req,status){
+		},
+		});
+	}
+
 	function downloadDeploymentSpace(){
 		$.post( "/api/v1/capacitor/draw", $( "#dspaceParam" ).val(),
 			function( data ) {

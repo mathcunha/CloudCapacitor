@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/mathcunha/CloudCapacitor/capacitor"
+	"io/ioutil"
 	"log"
 	"math"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -73,8 +75,29 @@ func drawDeploymentSpace(w http.ResponseWriter, r *http.Request) {
 	}
 	dspace := capacitor.NewDeploymentSpace(&vms, config.Price, config.Size)
 
+	graph := capacitor.NodesToDOT(dspace.CapacityBy(config.Mode))
 	w.Header().Set("Content-Type", "text/plain")
-	fmt.Fprintf(w, "%v", capacitor.NodesToDOT(dspace.CapacityBy(config.Mode)))
+	fmt.Fprintf(w, "%v", graph)
+}
+
+func callGraphviz(graph string) string {
+	log.Println("Graph", graph)
+
+	resp, err := http.PostForm("http://graphviz-dev.appspot.com/create_preview", url.Values{"engine": {"dot"}, "script": {graph}})
+	if err != nil {
+		log.Println("ERROR: drawDeploymentSpace calling remote service: %v", err)
+		return ""
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Println("ERROR: drawDeploymentSpace reading remote service: %v", err)
+		return ""
+	}
+
+	log.Println("response ", string(body))
+	return string(body)
 }
 
 func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
