@@ -180,15 +180,13 @@
 			data = data + ', "configuration":"'+$( "#configuration_approach" ).val()+'"}'
 
 			showSuccessMessage('Waiting reply...')
-
-			params = data
+			$( "#dspaceParam" ).val(data);
 			
-			$.post( "/api/v1/capacitor/", params, 
+			$.post( "/api/v1/capacitor/", data, 
 				function( data ) {
 					$( "#totalPrice" ).html(data.price);
 					$( "#totalExecs" ).html(data.execs);
 				        $( "#fMeasure" ).html(data.fmeasure);
-					$( "#dspaceParam" ).val(params);
 				        $( "#dspace" ).html('<a href="javascript:downloadDeploymentSpace()" style="color:white"> Get</a>');
 					$( "#panelExecPath" ).empty();
 					$( "#morris-bar-chart" ).empty();
