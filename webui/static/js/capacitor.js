@@ -168,6 +168,11 @@
 			data = data + ', "heuristic":"'+$( '#heuristic' ).val()+'"'
 			data = data + ', "category":'+$( 'input[name=category]:checked' ).val()
 			data = data + ', "demand":['+$( '#demand' ).val()+']'
+			if($( '#vmtype' ).val() != null){
+				data = data + ', "vmtype":['+$( '#vmtype' ).val()+']'
+			}else{
+				data = data + ', "vmtype":[]'
+			}
 		        if ($( "#maxExecs" ).val() != ''){
 				data = data + ', "maxExecs":'+$( '#maxExecs' ).val()
 			}

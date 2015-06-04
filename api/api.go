@@ -56,6 +56,7 @@ func drawDeploymentSpace(w http.ResponseWriter, r *http.Request) {
 		Size     int     `json:"instances"`
 		Mode     string  `json:"mode"`
 		Category bool    `json:"category"`
+		VMtype   []int   `json:"vmtype"`
 	}
 	err := json.NewDecoder(r.Body).Decode(&config)
 	r.Body.Close()
@@ -68,7 +69,7 @@ func drawDeploymentSpace(w http.ResponseWriter, r *http.Request) {
 		file = "config/dspace_nocat.yml"
 	}
 
-	vms, err := capacitor.LoadTypes(file)
+	vms, err := getVMTypes(file, config.VMtype)
 	if err != nil {
 		log.Println("ERROR: drawDeploymentSpace loanding vm types")
 		return
@@ -96,6 +97,28 @@ func callGraphviz(graph string) string {
 	return string(body)
 }
 
+func getVMTypes(file string, excludedVMs []int) (vms []capacitor.VM, err error) {
+	vms, err = capacitor.LoadTypes(file)
+	if err != nil {
+		return
+	}
+	if len(excludedVMs) > 0 {
+		localVMs := make([]capacitor.VM, len(vms)-len(excludedVMs), len(vms)-len(excludedVMs))
+		j := 0
+		k := 0
+		for i := 0; i < len(vms); i++ {
+			if j == len(excludedVMs) || i != excludedVMs[j] {
+				localVMs[k] = vms[i]
+				k++
+			} else {
+				j++
+			}
+		}
+		vms = localVMs
+	}
+	return
+}
+
 func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 	a_path := strings.Split(r.URL.Path, "/")
 	if "draw" == a_path[4] {
@@ -108,6 +131,7 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 			Mode          string  `json:"mode"`
 			Category      bool    `json:"category"`
 			Demand        []int   `json:"demand"`
+			VMtype        []int   `json:"vmtype"`
 			WKL           string  `json:"wkl"`
 			Configuration string  `json:"configuration"`
 			Heuristic     string  `json:"heuristic"`
@@ -126,7 +150,7 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 			file = "config/dspace_nocat.yml"
 		}
 
-		vms, err := capacitor.LoadTypes(file)
+		vms, err := getVMTypes(file, config.VMtype)
 		if err != nil {
 			log.Println("ERROR: callCapacitorResource loanding vm types")
 			return
