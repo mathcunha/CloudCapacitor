@@ -8,6 +8,11 @@ import (
 	"strconv"
 )
 
+const (
+	HighUsage = 70
+	LowUsage  = 40
+)
+
 type Result struct {
 	Config Configuration
 	Performance

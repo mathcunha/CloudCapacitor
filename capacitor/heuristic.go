@@ -12,6 +12,7 @@ const (
 	Conservative = "conservative"
 	Pessimistic  = "pessimistic"
 	Optimistic   = "optimistic"
+	Hybrid       = "hybrid"
 )
 
 type ExecInfo struct {
@@ -53,12 +54,12 @@ type Policy struct {
 
 func NewPolicy(c *Capacitor, levelPolicy string, wklPolicy string) (h *Policy) {
 	switch levelPolicy {
-	case Conservative, Pessimistic, Optimistic:
+	case Conservative, Pessimistic, Optimistic, Hybrid:
 	default:
 		log.Panicf("NewPolicy: levelPolicy not available:%v", levelPolicy)
 	}
 	switch wklPolicy {
-	case Conservative, Pessimistic, Optimistic:
+	case Conservative, Pessimistic, Optimistic, Hybrid:
 	default:
 		log.Panicf("NewPolicy: wklPolicy not available:%v", wklPolicy)
 	}
@@ -333,6 +334,19 @@ func (p *Policy) selectWorkload(nodesInfo *NodesInfo, key string) (wklID int) {
 		wklID = wkls[0]
 	case Optimistic:
 		wklID = wkls[len(wkls)-1]
+	case Hybrid:
+		nodeInfo := nodesInfo.Matrix[key]
+		result := p.c.Executor.Execute(*nodeInfo.Config, nodeInfo.WKL)
+		wklPolicy := Conservative
+		if result.CPU >= HighUsage || result.Mem >= HighUsage {
+			wklPolicy = Pessimistic
+		} else if result.CPU <= LowUsage || result.Mem <= LowUsage {
+			wklPolicy = Optimistic
+		}
+		policy := new(Policy)
+		policy.wklPolicy = wklPolicy
+		//log.Printf("hybrid WKL cpu:%v, mem:%v  choosing :%v", result.CPU, result.Mem, wklPolicy)
+		return policy.selectWorkload(nodesInfo, key)
 	}
 	return
 }
@@ -351,7 +365,19 @@ func (p *Policy) selectCapacityLevel(nodesInfo *NodesInfo, key string, nodes *No
 		level = levels[0]
 	case Pessimistic:
 		level = levels[len(levels)-1]
-
+	case Hybrid:
+		nodeInfo := nodesInfo.Matrix[key]
+		result := p.c.Executor.Execute(*nodeInfo.Config, nodeInfo.WKL)
+		levelPolicy := Conservative
+		if result.CPU >= HighUsage || result.Mem >= HighUsage {
+			levelPolicy = Pessimistic
+		} else if result.CPU <= LowUsage || result.Mem <= LowUsage {
+			levelPolicy = Optimistic
+		}
+		policy := new(Policy)
+		policy.levelPolicy = levelPolicy
+		//log.Printf("hybrid LEVEL cpu:%v, mem:%v  choosing :%v", result.CPU, result.Mem, levelPolicy)
+		return policy.selectCapacityLevel(nodesInfo, key, nodes)
 	}
 	return
 }
