@@ -124,14 +124,15 @@
 					showWarningMessage('Error generating graph. The service is probably down');
 					panel = '<div class=\"alert alert-info alert-dismissible\" role=\"alert\"><button type=\"button\" class=\"close\" data-dismiss=\"alert\" aria-label=\"Close\"><span aria-hidden=\"true\">&times;</span></button><pre>';
 					panel = panel + data
-			panel = panel + '</pre></div>'
+					panel = panel + '</pre></div>'
+					$("#mainAlertPanel").append(panel);
 				}
 				else{
 					showSuccessMessage('Done!')
-					panel = '<div class=\"alert alert-info alert-dismissible\" role=\"alert\"><button type=\"button\" class=\"close\" data-dismiss=\"alert\" aria-label=\"Close\"><span aria-hidden=\"true\">&times;</span></button><img src=\'http://graphviz-dev.appspot.com/get_preview?id='+data;
-					panel = panel + '\'/></div>'
+					var a = $("<a>").attr("href", 'http://graphviz-dev.appspot.com/get_preview?id='+data).attr("download", 'http://graphviz-dev.appspot.com/get_preview?id='+data).appendTo("body");
+		                        a[0].click();
+					a.remove();
 				}
-				$("#mainAlertPanel").append(panel);
 			}
 		, "text" );
 	}
@@ -183,7 +184,7 @@
 					$( "#totalExecs" ).html(data.execs);
 				        $( "#fMeasure" ).html(data.fmeasure);
 					$( "#dspaceParam" ).val(params);
-				        $( "#dspace" ).html('<a href="javascript:downloadDeploymentSpace()" style="color:white"> View</a>');
+				        $( "#dspace" ).html('<a href="javascript:downloadDeploymentSpace()" style="color:white"> Get</a>');
 					$( "#panelExecPath" ).empty();
 					$( "#morris-bar-chart" ).empty();
 
