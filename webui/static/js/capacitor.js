@@ -117,19 +117,19 @@
 	}
 
 	function downloadDeploymentSpace(){
+		showSuccessMessage('Generating graph...')
 		$.post( "/api/v1/capacitor/draw", $( "#dspaceParam" ).val(),
 			function( data ) {
-				graph = data.replace(new RegExp("#", 'g'), "%23")
-				if (graph.length <= 2800){
-
-				panel = '<div class=\"alert alert-info alert-dismissible\" role=\"alert\"><button type=\"button\" class=\"close\" data-dismiss=\"alert\" aria-label=\"Close\"><span aria-hidden=\"true\">&times;</span></button><img src=\'http://g.gravizo.com/g?';
-				panel = panel + graph
-				panel = panel + '\'/></div>'
+				if(data == 'ERROR'){
+					showWarningMessage('Error generating graph. The service is probably down');
+					panel = '<div class=\"alert alert-info alert-dismissible\" role=\"alert\"><button type=\"button\" class=\"close\" data-dismiss=\"alert\" aria-label=\"Close\"><span aria-hidden=\"true\">&times;</span></button><pre>';
+					panel = panel + data
+			panel = panel + '</pre></div>'
 				}
 				else{
-					panel = '<div class=\"alert alert-info alert-dismissible\" role=\"alert\"><button type=\"button\" class=\"close\" data-dismiss=\"alert\" aria-label=\"Close\"><span aria-hidden=\"true\">&times;</span></button><pre>';
-	                                panel = panel + data
-	                                panel = panel + '</pre></div>'
+					showSuccessMessage('Done!')
+					panel = '<div class=\"alert alert-info alert-dismissible\" role=\"alert\"><button type=\"button\" class=\"close\" data-dismiss=\"alert\" aria-label=\"Close\"><span aria-hidden=\"true\">&times;</span></button><img src=\'http://graphviz-dev.appspot.com/get_preview?id='+data;
+					panel = panel + '\'/></div>'
 				}
 				$("#mainAlertPanel").append(panel);
 			}
@@ -183,7 +183,7 @@
 					$( "#totalExecs" ).html(data.execs);
 				        $( "#fMeasure" ).html(data.fmeasure);
 					$( "#dspaceParam" ).val(params);
-				        $( "#dspace" ).html('<a href="javascript:downloadDeploymentSpace()" style="color:white"> get</a>');
+				        $( "#dspace" ).html('<a href="javascript:downloadDeploymentSpace()" style="color:white"> View</a>');
 					$( "#panelExecPath" ).empty();
 					$( "#morris-bar-chart" ).empty();
 

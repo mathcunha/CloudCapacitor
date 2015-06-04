@@ -290,7 +290,7 @@ func (nodes *Nodes) NodeByLevel(level int) (node *Node) {
 func NodesToDOT(mapNodes *map[string]Nodes) (str string) {
 	colors := []string{"#FFCDD2", "#B2EBF2", "#C8E6C9", "#FFF9C4", "#E1BEE7", "#F0F4C3", "#D7CCC8", "#FFE0B2"}
 
-	str = "\ndigraph g {\n"
+	str = "\ngraph g {\n"
 
 	edges := make(map[string]*[2]bool)
 
@@ -300,7 +300,7 @@ func NodesToDOT(mapNodes *map[string]Nodes) (str string) {
 			str = fmt.Sprintf("%v\"%v\" [label=\"%v\",shape=box,fillcolor=\"%v\",style=\"filled,rounded\"];\n", str, node.ID, desc, colors[node.Level%8])
 
 			for _, lower := range node.Lower {
-				key := fmt.Sprintf("\"%v\" -> \"%v\"", node.ID, lower.ID)
+				key := fmt.Sprintf("\"%v\" -- \"%v\"", node.ID, lower.ID)
 				if v, has := edges[key]; has {
 					v[0] = true
 				} else {
@@ -308,7 +308,7 @@ func NodesToDOT(mapNodes *map[string]Nodes) (str string) {
 				}
 			}
 			for _, higher := range node.Higher {
-				key := fmt.Sprintf("\"%v\" -> \"%v\"", higher.ID, node.ID)
+				key := fmt.Sprintf("\"%v\" -- \"%v\"", higher.ID, node.ID)
 				if v, has := edges[key]; has {
 					v[1] = true
 				} else {

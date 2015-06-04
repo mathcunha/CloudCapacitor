@@ -77,12 +77,10 @@ func drawDeploymentSpace(w http.ResponseWriter, r *http.Request) {
 
 	graph := capacitor.NodesToDOT(dspace.CapacityBy(config.Mode))
 	w.Header().Set("Content-Type", "text/plain")
-	fmt.Fprintf(w, "%v", graph)
+	fmt.Fprintf(w, "%v", callGraphviz(graph))
 }
 
 func callGraphviz(graph string) string {
-	log.Println("Graph", graph)
-
 	resp, err := http.PostForm("http://graphviz-dev.appspot.com/create_preview", url.Values{"engine": {"dot"}, "script": {graph}})
 	if err != nil {
 		log.Println("ERROR: drawDeploymentSpace calling remote service: %v", err)
@@ -95,8 +93,6 @@ func callGraphviz(graph string) string {
 		log.Println("ERROR: drawDeploymentSpace reading remote service: %v", err)
 		return ""
 	}
-
-	log.Println("response ", string(body))
 	return string(body)
 }
 
