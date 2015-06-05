@@ -10,6 +10,6 @@ func TestMockExecutor(t *testing.T) {
 	if err != nil {
 		t.Errorf("config error")
 	}
-	result := m.Execute(Configuration{1, VM{1.0, 1.0, 1.0, "m3", "m3_medium"}}, "1000")
+	result := m.Execute(Configuration{1, VM{1.0, 1.0, 1.0, "m3", "m3_medium", 1}}, "1000")
 	t.Logf("%v\n", result)
 }

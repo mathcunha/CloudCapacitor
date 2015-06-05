@@ -123,7 +123,7 @@ func (dspace *DeploymentSpace) buildNodesStrict(prop string) *map[string]Nodes {
 					}
 				}
 				if out.Config.Size == in.Config.Size {
-					if out.Config.Strict()*2 == in.Config.Strict() {
+					if out.Config.Strict()+1 == in.Config.Strict() {
 						if out.Lower == nil {
 							out.Lower = Nodes{}
 						}

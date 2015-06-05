@@ -13,6 +13,7 @@ type VM struct {
 	Price    float32
 	Category string
 	Name     string
+	Strict   int
 }
 
 type Configuration struct {
@@ -32,12 +33,12 @@ func (c *Configuration) CPU() float32 {
 	return float32(c.Size) * c.VM.CPU
 }
 
-func (c *Configuration) Strict() float32 {
-	return c.VM.Mem
+func (c *Configuration) Strict() int {
+	return c.VM.Strict
 }
 
 func (vm VM) String() string {
-	return fmt.Sprintf("{category:%v, cpu:%v , mem:%v, price:%v}", vm.Category, vm.CPU, vm.Mem, vm.Price)
+	return fmt.Sprintf("{category:%v, cpu:%v , mem:%v, price:%v, strict:%v}", vm.Category, vm.CPU, vm.Mem, vm.Price, vm.Strict)
 }
 
 func (c Configuration) String() string {
@@ -56,6 +57,11 @@ func LoadTypes(path string) (vms []VM, err error) {
 	if err != nil {
 		log.Printf("error parsing file %v:%v", path, err)
 		return nil, err
+	}
+
+	//the array must be sorted by capacity
+	for i, _ := range vms {
+		vms[i].Strict = i + 1
 	}
 
 	return vms, nil
