@@ -213,14 +213,15 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 
 		key := h.selectStartingPoint(&nodesInfo, &nodes)
 
-		level := h.selectCapacityLevel(&nodesInfo, key, &nodes)
-		wkl := h.selectWorkload(&nodesInfo, key)
+		level := h.selectCapacityLevel(&nodesInfo, key, &nodes, nil)
+		wkl := h.selectWorkload(&nodesInfo, key, nil)
 		key, nodeInfo := h.NextConfig(&nodesInfo, nodes, level, wkl)
 
 		//Process main loop, basically there will be no blank space
+		var result Result
 		for h.c.HasMore(&nodesInfo) {
 			if !(nodeInfo.When != -1) {
-				result := h.c.Executor.Execute(*nodeInfo.Config, nodeInfo.WKL)
+				result = h.c.Executor.Execute(*nodeInfo.Config, nodeInfo.WKL)
 				//log.Printf("[Policy.Exec] WKL:%v Result:%v\n", wkls[wkl], result)
 				execInfo.Path = fmt.Sprintf("%v%v->", execInfo.Path, key)
 				execInfo.Execs++
@@ -233,7 +234,7 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 				key = GetMatrixKey(node.ID, wkl)
 				nodeInfo = nodesInfo.Matrix[key]
 				if !(nodeInfo.When != -1) {
-					result := h.c.Executor.Execute(*nodeInfo.Config, nodeInfo.WKL)
+					result = h.c.Executor.Execute(*nodeInfo.Config, nodeInfo.WKL)
 					//log.Printf("[Policy.Exec] WKL:%v Result:%v\n", wkls[wkl], result)
 					execInfo.Path = fmt.Sprintf("%v%v->", execInfo.Path, key)
 					execInfo.Execs++
@@ -242,20 +243,20 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 			}
 			//select capacity level
 			oldLevel := level
-			level = h.selectCapacityLevel(&nodesInfo, key, &nodes)
+			level = h.selectCapacityLevel(&nodesInfo, key, &nodes, &result)
 
 			//select workload
 			if level == -1 {
 				level = oldLevel
-				wkl = h.selectWorkload(&nodesInfo, key)
+				wkl = h.selectWorkload(&nodesInfo, key, &result)
 			}
 
 			//select other starting point
 			if wkl == -1 {
 				localKey := h.selectStartingPoint(&nodesInfo, &nodes)
 				if localKey != "" {
-					level = h.selectCapacityLevel(&nodesInfo, localKey, &nodes)
-					wkl = h.selectWorkload(&nodesInfo, localKey)
+					level = h.selectCapacityLevel(&nodesInfo, localKey, &nodes, &result)
+					wkl = h.selectWorkload(&nodesInfo, localKey, &result)
 				} else if h.c.HasMore(&nodesInfo) {
 					log.Printf("ERROR: [Policy.Exec] Starting Point \n:%v\n%v", nodesInfo, nodes)
 					break
@@ -320,7 +321,7 @@ func (p *Policy) selectStartingPoint(nodesInfo *NodesInfo, nodes *Nodes) (key st
 	return ""
 }
 
-func (p *Policy) selectWorkload(nodesInfo *NodesInfo, key string) (wklID int) {
+func (p *Policy) selectWorkload(nodesInfo *NodesInfo, key string, result *Result) (wklID int) {
 	_, wkls := p.buildWorkloadList(key, nodesInfo)
 	wklID = -1
 	if len(wkls) == 0 {
@@ -335,23 +336,23 @@ func (p *Policy) selectWorkload(nodesInfo *NodesInfo, key string) (wklID int) {
 	case Optimistic:
 		wklID = wkls[len(wkls)-1]
 	case Hybrid:
-		nodeInfo := nodesInfo.Matrix[key]
-		result := p.c.Executor.Execute(*nodeInfo.Config, nodeInfo.WKL)
 		wklPolicy := Conservative
-		if result.CPU >= HighUsage || result.Mem >= HighUsage {
-			wklPolicy = Pessimistic
-		} else if result.CPU <= LowUsage || result.Mem <= LowUsage {
-			wklPolicy = Optimistic
+		if result != nil {
+			if result.CPU >= HighUsage || result.Mem >= HighUsage {
+				wklPolicy = Pessimistic
+			} else if result.CPU <= LowUsage || result.Mem <= LowUsage {
+				wklPolicy = Optimistic
+			}
 		}
 		policy := new(Policy)
 		policy.wklPolicy = wklPolicy
 		//log.Printf("hybrid WKL cpu:%v, mem:%v  choosing :%v", result.CPU, result.Mem, wklPolicy)
-		return policy.selectWorkload(nodesInfo, key)
+		return policy.selectWorkload(nodesInfo, key, result)
 	}
 	return
 }
 
-func (p *Policy) selectCapacityLevel(nodesInfo *NodesInfo, key string, nodes *Nodes) (level int) {
+func (p *Policy) selectCapacityLevel(nodesInfo *NodesInfo, key string, nodes *Nodes, result *Result) (level int) {
 	_, levels := p.buildCapacityLevelList(key, nodesInfo, nodes)
 	level = -1
 	if len(levels) == 0 {
@@ -366,18 +367,18 @@ func (p *Policy) selectCapacityLevel(nodesInfo *NodesInfo, key string, nodes *No
 	case Pessimistic:
 		level = levels[len(levels)-1]
 	case Hybrid:
-		nodeInfo := nodesInfo.Matrix[key]
-		result := p.c.Executor.Execute(*nodeInfo.Config, nodeInfo.WKL)
 		levelPolicy := Conservative
-		if result.CPU >= HighUsage || result.Mem >= HighUsage {
-			levelPolicy = Pessimistic
-		} else if result.CPU <= LowUsage || result.Mem <= LowUsage {
-			levelPolicy = Optimistic
+		if result != nil {
+			if result.CPU >= HighUsage || result.Mem >= HighUsage {
+				levelPolicy = Pessimistic
+			} else if result.CPU <= LowUsage || result.Mem <= LowUsage {
+				levelPolicy = Optimistic
+			}
 		}
 		policy := new(Policy)
 		policy.levelPolicy = levelPolicy
 		//log.Printf("hybrid LEVEL cpu:%v, mem:%v  choosing :%v", result.CPU, result.Mem, levelPolicy)
-		return policy.selectCapacityLevel(nodesInfo, key, nodes)
+		return policy.selectCapacityLevel(nodesInfo, key, nodes, result)
 	}
 	return
 }
