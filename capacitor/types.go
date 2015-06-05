@@ -61,7 +61,7 @@ func LoadTypes(path string) (vms []VM, err error) {
 
 	//the array must be sorted by capacity
 	for i, _ := range vms {
-		vms[i].Strict = i + 1
+		vms[i].Strict = i
 	}
 
 	return vms, nil

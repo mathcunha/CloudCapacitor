@@ -117,7 +117,7 @@ func getVMTypes(file string, excludedVMs []int) (vms []capacitor.VM, err error) 
 		vms = localVMs
 	}
 	for i, _ := range vms {
-		vms[i].Strict = i + 1
+		vms[i].Strict = i
 	}
 	return
 }
