@@ -13,6 +13,7 @@ const (
 	Pessimistic  = "pessimistic"
 	Optimistic   = "optimistic"
 	Hybrid       = "hybrid"
+	Sensitive    = "sensitive"
 )
 
 type ExecInfo struct {
@@ -54,12 +55,12 @@ type Policy struct {
 
 func NewPolicy(c *Capacitor, levelPolicy string, wklPolicy string) (h *Policy) {
 	switch levelPolicy {
-	case Conservative, Pessimistic, Optimistic, Hybrid:
+	case Conservative, Pessimistic, Optimistic, Hybrid, Sensitive:
 	default:
 		log.Panicf("NewPolicy: levelPolicy not available:%v", levelPolicy)
 	}
 	switch wklPolicy {
-	case Conservative, Pessimistic, Optimistic, Hybrid:
+	case Conservative, Pessimistic, Optimistic, Hybrid, Sensitive:
 	default:
 		log.Panicf("NewPolicy: wklPolicy not available:%v", wklPolicy)
 	}
@@ -213,8 +214,8 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 
 		key := h.selectStartingPoint(&nodesInfo, &nodes)
 
-		level := h.selectCapacityLevel(&nodesInfo, key, &nodes, nil)
-		wkl := h.selectWorkload(&nodesInfo, key, nil)
+		level := h.selectCapacityLevel(&nodesInfo, key, &nodes, nil, slo)
+		wkl := h.selectWorkload(&nodesInfo, key, nil, slo)
 		key, nodeInfo := h.NextConfig(&nodesInfo, nodes, level, wkl)
 
 		//Process main loop, basically there will be no blank space
@@ -243,20 +244,20 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 			}
 			//select capacity level
 			oldLevel := level
-			level = h.selectCapacityLevel(&nodesInfo, key, &nodes, &result)
+			level = h.selectCapacityLevel(&nodesInfo, key, &nodes, &result, slo)
 
 			//select workload
 			if level == -1 {
 				level = oldLevel
-				wkl = h.selectWorkload(&nodesInfo, key, &result)
+				wkl = h.selectWorkload(&nodesInfo, key, &result, slo)
 			}
 
 			//select other starting point
 			if wkl == -1 {
 				localKey := h.selectStartingPoint(&nodesInfo, &nodes)
 				if localKey != "" {
-					level = h.selectCapacityLevel(&nodesInfo, localKey, &nodes, &result)
-					wkl = h.selectWorkload(&nodesInfo, localKey, &result)
+					level = h.selectCapacityLevel(&nodesInfo, localKey, &nodes, &result, slo)
+					wkl = h.selectWorkload(&nodesInfo, localKey, &result, slo)
 				} else if h.c.HasMore(&nodesInfo) {
 					log.Printf("ERROR: [Policy.Exec] Starting Point \n:%v\n%v", nodesInfo, nodes)
 					break
@@ -321,7 +322,7 @@ func (p *Policy) selectStartingPoint(nodesInfo *NodesInfo, nodes *Nodes) (key st
 	return ""
 }
 
-func (p *Policy) selectWorkload(nodesInfo *NodesInfo, key string, result *Result) (wklID int) {
+func (p *Policy) selectWorkload(nodesInfo *NodesInfo, key string, result *Result, slo float32) (wklID int) {
 	_, wkls := p.buildWorkloadList(key, nodesInfo)
 	wklID = -1
 	if len(wkls) == 0 {
@@ -347,12 +348,30 @@ func (p *Policy) selectWorkload(nodesInfo *NodesInfo, key string, result *Result
 		policy := new(Policy)
 		policy.wklPolicy = wklPolicy
 		//log.Printf("hybrid WKL cpu:%v, mem:%v  choosing :%v", result.CPU, result.Mem, wklPolicy)
-		return policy.selectWorkload(nodesInfo, key, result)
+		return policy.selectWorkload(nodesInfo, key, result, slo)
+	case Sensitive:
+		if result == nil {
+			wklID = wkls[len(wkls)/2]
+			return
+		}
+		passed := result.SLO <= slo
+		delta := result.SLO / slo
+		length := len(wkls)
+		scale := float32(1) / float32(length)
+		if !passed {
+			delta = slo / result.SLO
+		}
+		wklID = int(delta / scale)
+		if !passed {
+			wklID = length - 1 - wklID
+		}
+		//log.Printf("sensitive passed:%v delta:%v scale:%v len:%v WKL:%v", passed, delta, scale, length, wklID)
+		wklID = wkls[wklID]
 	}
 	return
 }
 
-func (p *Policy) selectCapacityLevel(nodesInfo *NodesInfo, key string, nodes *Nodes, result *Result) (level int) {
+func (p *Policy) selectCapacityLevel(nodesInfo *NodesInfo, key string, nodes *Nodes, result *Result, slo float32) (level int) {
 	_, levels := p.buildCapacityLevelList(key, nodesInfo, nodes)
 	level = -1
 	if len(levels) == 0 {
@@ -367,7 +386,7 @@ func (p *Policy) selectCapacityLevel(nodesInfo *NodesInfo, key string, nodes *No
 	case Pessimistic:
 		level = levels[len(levels)-1]
 	case Hybrid:
-		levelPolicy := Conservative
+		levelPolicy := Optimistic
 		if result != nil {
 			if result.CPU >= HighUsage || result.Mem >= HighUsage {
 				levelPolicy = Pessimistic
@@ -378,7 +397,25 @@ func (p *Policy) selectCapacityLevel(nodesInfo *NodesInfo, key string, nodes *No
 		policy := new(Policy)
 		policy.levelPolicy = levelPolicy
 		//log.Printf("hybrid LEVEL cpu:%v, mem:%v  choosing :%v", result.CPU, result.Mem, levelPolicy)
-		return policy.selectCapacityLevel(nodesInfo, key, nodes, result)
+		return policy.selectCapacityLevel(nodesInfo, key, nodes, result, slo)
+	case Sensitive:
+		if result == nil {
+			level = levels[0]
+			return
+		}
+		passed := result.SLO <= slo
+		delta := result.SLO / slo
+		length := len(levels)
+		scale := float32(1) / float32(length)
+		if !passed {
+			delta = slo / result.SLO
+		}
+		level = int(delta / scale)
+		if !passed {
+			level = length - 1 - level
+		}
+		//log.Printf("sensitive passed:%v delta:%v scale:%v len:%v Level:%v", passed, delta, scale, length, level)
+		level = levels[level]
 	}
 	return
 }

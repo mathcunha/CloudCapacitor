@@ -82,6 +82,7 @@ func drawDeploymentSpace(w http.ResponseWriter, r *http.Request) {
 }
 
 func callGraphviz(graph string) string {
+	log.Println(graph)
 	resp, err := http.PostForm("http://graphviz-dev.appspot.com/create_preview", url.Values{"engine": {"dot"}, "script": {graph}})
 	if err != nil {
 		log.Println("ERROR: drawDeploymentSpace calling remote service: %v", err)
