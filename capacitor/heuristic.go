@@ -16,6 +16,11 @@ const (
 	Sensitive    = "sensitive"
 )
 
+const (
+	Exec = iota
+	Mark
+)
+
 type ExecInfo struct {
 	Execs int
 	Path  string
@@ -48,12 +53,13 @@ type ExplorePath struct {
 
 //the policies proposed at thesis
 type Policy struct {
-	c           *Capacitor
-	levelPolicy string
-	wklPolicy   string
+	c            *Capacitor
+	levelPolicy  string
+	wklPolicy    string
+	equiBehavior int
 }
 
-func NewPolicy(c *Capacitor, levelPolicy string, wklPolicy string) (h *Policy) {
+func NewPolicy(c *Capacitor, levelPolicy string, wklPolicy string, equiBehavior int) (h *Policy) {
 	switch levelPolicy {
 	case Conservative, Pessimistic, Optimistic, Hybrid, Sensitive:
 	default:
@@ -64,7 +70,12 @@ func NewPolicy(c *Capacitor, levelPolicy string, wklPolicy string) (h *Policy) {
 	default:
 		log.Panicf("NewPolicy: wklPolicy not available:%v", wklPolicy)
 	}
-	return &(Policy{c, levelPolicy, wklPolicy})
+	switch equiBehavior {
+	case Mark, Exec:
+	default:
+		log.Panicf("NewPolicy: equiBehavior not available:%v", equiBehavior)
+	}
+	return &(Policy{c, levelPolicy, wklPolicy, equiBehavior})
 }
 
 func NewShortestPath(c *Capacitor) (h *ShortestPath) {
@@ -229,18 +240,32 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 				(&nodesInfo).Mark(key, result.SLO <= slo, execInfo.Execs)
 			}
 
-			//execute all equivalents
+			//Equivalents Actions
 			equivalent := nodes.Equivalents((&nodeInfo.Node))
-			for _, node := range equivalent {
-				key = GetMatrixKey(node.ID, wkl)
-				nodeInfo = nodesInfo.Matrix[key]
-				if !(nodeInfo.When != -1) {
-					result = h.c.Executor.Execute(*nodeInfo.Config, nodeInfo.WKL)
-					//log.Printf("[Policy.Exec] WKL:%v Result:%v\n", wkls[wkl], result)
-					execInfo.Path = fmt.Sprintf("%v%v->", execInfo.Path, key)
-					execInfo.Execs++
-					(&nodesInfo).Mark(key, result.SLO <= slo, execInfo.Execs)
+			switch h.equiBehavior {
+			case Exec:
+				//execute all equivalents
+				for _, node := range equivalent {
+					key = GetMatrixKey(node.ID, wkl)
+					nodeInfo = nodesInfo.Matrix[key]
+					if !(nodeInfo.When != -1) {
+						result = h.c.Executor.Execute(*nodeInfo.Config, nodeInfo.WKL)
+						//log.Printf("[Policy.Exec] WKL:%v Result:%v\n", wkls[wkl], result)
+						execInfo.Path = fmt.Sprintf("%v%v->", execInfo.Path, key)
+						execInfo.Execs++
+						(&nodesInfo).Mark(key, result.SLO <= slo, execInfo.Execs)
+					}
 				}
+			case Mark:
+				//mark all equivalents
+				for _, node := range equivalent {
+					key = GetMatrixKey(node.ID, wkl)
+					nodeInfo = nodesInfo.Matrix[key]
+					if !(nodeInfo.When != -1) {
+						(&nodesInfo).Mark(key, result.SLO <= slo, execInfo.Execs)
+					}
+				}
+
 			}
 			//select capacity level
 			oldLevel := level

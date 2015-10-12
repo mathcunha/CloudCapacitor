@@ -140,6 +140,7 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 			Configuration string  `json:"configuration"`
 			Heuristic     string  `json:"heuristic"`
 			MaxExecs      int     `json:"maxExecs"`
+			EquiBehavior  int     `json:"equiBehavior"`
 		}
 
 		err := json.NewDecoder(r.Body).Decode(&config)
@@ -177,7 +178,7 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 		case "sp":
 			h = capacitor.NewShortestPath(&c)
 		default:
-			h = capacitor.NewPolicy(&c, config.Configuration, config.WKL)
+			h = capacitor.NewPolicy(&c, config.Configuration, config.WKL, config.EquiBehavior)
 		}
 
 		wkls := make([]string, len(config.Demand), len(config.Demand))

@@ -2,9 +2,11 @@
 		if ('policy' == $(this).val()){
 			$( "#workload_approach" ).removeAttr('disabled');
                         $( "#configuration_approach" ).removeAttr('disabled');
+			$( "#equivalents_behavior" ).removeAttr('disabled');
 		}else{
 			$( "#workload_approach" ).attr('disabled', 'disabled');
 			$( "#configuration_approach" ).attr('disabled', 'disabled');
+			$( "#equivalents_behavior" ).attr('disabled', 'disabled');
 		}
 		if ('e' == $(this).val()){
 			$( "#maxExecs" ).removeAttr('disabled');
@@ -177,7 +179,8 @@
 				data = data + ', "maxExecs":'+$( '#maxExecs' ).val()
 			}
 			data = data + ', "wkl":"'+$( "#workload_approach" ).val()+'"'
-			data = data + ', "configuration":"'+$( "#configuration_approach" ).val()+'"}'
+			data = data + ', "configuration":"'+$( "#configuration_approach" ).val()+'"'
+			data = data + ', "equiBehavior":'+$( "#equivalents_behavior" ).val()+'}'
 
 			showSuccessMessage('Waiting reply...')
 			$( "#dspaceParam" ).val(data);
