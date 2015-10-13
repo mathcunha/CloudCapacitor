@@ -168,6 +168,7 @@
 			data = data + ', "instances":'+$( "#instances" ).val()
 			data = data + ', "mode":"'+$( "#mode" ).val()+'"'
 			data = data + ', "heuristic":"'+$( '#heuristic' ).val()+'"'
+			data = data + ', "app":"'+$( '#app' ).val()+'"'
 			data = data + ', "category":'+$( 'input[name=category]:checked' ).val()
 			data = data + ', "demand":['+$( '#demand' ).val()+']'
 			if($( '#vmtype' ).val() != null){

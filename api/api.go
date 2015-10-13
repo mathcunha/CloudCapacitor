@@ -141,6 +141,7 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 			Heuristic     string  `json:"heuristic"`
 			MaxExecs      int     `json:"maxExecs"`
 			EquiBehavior  int     `json:"equiBehavior"`
+			App           string  `json:"app"`
 		}
 
 		err := json.NewDecoder(r.Body).Decode(&config)
@@ -161,7 +162,7 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		dspace := capacitor.NewDeploymentSpace(&vms, config.Price, config.Size)
-		m := capacitor.MockExecutor{"config/wordpress_cpu_mem.csv", nil}
+		m := capacitor.MockExecutor{"config/" + config.App + "_cpu_mem.csv", nil}
 		err = m.Load()
 		if err != nil {
 			log.Println("ERROR: callCapacitorResource unable to start MockExecutor")
