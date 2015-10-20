@@ -51,7 +51,7 @@ func getPort() string {
 
 func drawDeploymentSpace(w http.ResponseWriter, r *http.Request) {
 	var config struct {
-		Slo      int     `json:"slo"`
+		Slo      float32 `json:"slo"`
 		Price    float32 `json:"price"`
 		Size     int     `json:"instances"`
 		Mode     string  `json:"mode"`
@@ -129,7 +129,7 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 		drawDeploymentSpace(w, r)
 	} else {
 		var config struct {
-			Slo           int     `json:"slo"`
+			Slo           float32 `json:"slo"`
 			Price         float32 `json:"price"`
 			Size          int     `json:"instances"`
 			Mode          string  `json:"mode"`
@@ -187,10 +187,10 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 			wkls[i] = strconv.Itoa(d)
 		}
 
-		execInfo, dspaceInfo := h.Exec(config.Mode, float32(config.Slo), wkls)
+		execInfo, dspaceInfo := h.Exec(config.Mode, config.Slo, wkls)
 
 		str := ExecPathSummary(execInfo, wkls, config.Mode, &c)
-		if strDeployment := DeploymentSpace(config.Mode, &c, dspaceInfo, m, float32(config.Slo)); len(strDeployment) > 1 {
+		if strDeployment := DeploymentSpace(config.Mode, &c, dspaceInfo, m, config.Slo); len(strDeployment) > 1 {
 			str = fmt.Sprintf("%v, \"spaceInfo\":%v}", str[0:len(str)-1], strDeployment)
 		} else {
 			str = fmt.Sprintf("%v, \"spaceInfo\":[]}", str[0:len(str)-1])
