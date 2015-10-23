@@ -191,7 +191,7 @@
 					$( "#totalPrice" ).html(data.price);
 					$( "#totalExecs" ).html(data.execs);
 				        $( "#fMeasure" ).html(data.fmeasure);
-				        $( "#dspace" ).html('<a href="javascript:downloadDeploymentSpace()" style="color:white"> Get</a>');
+					$( "#success" ).html(data.success);
 					$( "#panelExecPath" ).empty();
 					$( "#morris-bar-chart" ).empty();
 
@@ -247,7 +247,7 @@
 					});
 					newTable = newTable + '</tbody></table>';
 					$( "#panelFullTrace" ).append(newTable);
-			      		showSuccessMessage('Done!')
+			      		showSuccessMessage('Done! <a href="javascript:downloadDeploymentSpace()" style="color:green"> Get DSpace</a>')
 
 				}
 			      , "json" );

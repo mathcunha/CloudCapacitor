@@ -14,6 +14,11 @@ import (
 	"strings"
 )
 
+type ExecInfo struct {
+	Config *capacitor.Configuration
+	right  bool
+}
+
 func restHandlerV1(w http.ResponseWriter, r *http.Request) {
 	a_path := strings.Split(r.URL.Path, "/")
 	if "POST" != r.Method {
@@ -82,7 +87,6 @@ func drawDeploymentSpace(w http.ResponseWriter, r *http.Request) {
 }
 
 func callGraphviz(graph string) string {
-	log.Println(graph)
 	resp, err := http.PostForm("http://graphviz-dev.appspot.com/create_preview", url.Values{"engine": {"dot"}, "script": {graph}})
 	if err != nil {
 		log.Println("ERROR: drawDeploymentSpace calling remote service: %v", err)
@@ -188,15 +192,23 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 		}
 
 		execInfo, dspaceInfo := h.Exec(config.Mode, config.Slo, wkls)
+		bestPrice := make(map[string]ExecInfo)
 
 		str := ExecPathSummary(execInfo, wkls, config.Mode, &c)
-		if strDeployment := DeploymentSpace(config.Mode, &c, dspaceInfo, m, config.Slo); len(strDeployment) > 1 {
+		if strDeployment := DeploymentSpace(config.Mode, &c, dspaceInfo, m, config.Slo, &bestPrice); len(strDeployment) > 1 {
 			str = fmt.Sprintf("%v, \"spaceInfo\":%v}", str[0:len(str)-1], strDeployment)
 		} else {
 			str = fmt.Sprintf("%v, \"spaceInfo\":[]}", str[0:len(str)-1])
 		}
 
-		str = fmt.Sprintf("%v,%v}", str[0:len(str)-1], ExecsByKey(execInfo, &c, dspaceInfo, wkls))
+		success := 0
+		for _, e := range bestPrice {
+			if e.right {
+				success += 1
+			}
+		}
+
+		str = fmt.Sprintf("%v,%v, \"success\":%v}", str[0:len(str)-1], ExecsByKey(execInfo, &c, dspaceInfo, wkls), float32(success)/float32(len(config.Demand)))
 
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprintf(w, "%v", str)
@@ -244,7 +256,7 @@ func CalcFmeasure(tp int, fp int, fn int) (fmeasure float64) {
 	return
 }
 
-func DeploymentSpace(mode string, c *capacitor.Capacitor, dspaceInfo map[string]capacitor.NodesInfo, executor capacitor.Executor, slo float32) (str string) {
+func DeploymentSpace(mode string, c *capacitor.Capacitor, dspaceInfo map[string]capacitor.NodesInfo, executor capacitor.Executor, slo float32, bestPrice *map[string]ExecInfo) (str string) {
 	nodeMap := *c.Dspace.CapacityBy(mode)
 
 	str = "["
@@ -254,11 +266,11 @@ func DeploymentSpace(mode string, c *capacitor.Capacitor, dspaceInfo map[string]
 		for level := 1; level <= nodesInfo.Levels; level++ {
 			node := nodes.NodeByLevel(level)
 			for wkl := 0; wkl < nodesInfo.Workloads; wkl++ {
-				str = fmt.Sprintf("%v%v", str, PrintNodeExecInfo(node, wkl, nodesInfo, executor, slo))
+				str = fmt.Sprintf("%v%v", str, PrintNodeExecInfo(node, wkl, nodesInfo, executor, slo, bestPrice))
 			}
 			for _, e := range nodes.Equivalents(node) {
 				for wkl := 0; wkl < nodesInfo.Workloads; wkl++ {
-					str = fmt.Sprintf("%v%v", str, PrintNodeExecInfo(e, wkl, nodesInfo, executor, slo))
+					str = fmt.Sprintf("%v%v", str, PrintNodeExecInfo(e, wkl, nodesInfo, executor, slo, bestPrice))
 				}
 			}
 		}
@@ -269,7 +281,7 @@ func DeploymentSpace(mode string, c *capacitor.Capacitor, dspaceInfo map[string]
 	return
 }
 
-func PrintNodeExecInfo(node *capacitor.Node, wkl int, nodesInfo capacitor.NodesInfo, executor capacitor.Executor, slo float32) (str string) {
+func PrintNodeExecInfo(node *capacitor.Node, wkl int, nodesInfo capacitor.NodesInfo, executor capacitor.Executor, slo float32, bestPrice *map[string]ExecInfo) (str string) {
 	key := capacitor.GetMatrixKey(node.ID, wkl)
 	nodeInfo := nodesInfo.Matrix[key]
 	if wkl == 0 {
@@ -278,6 +290,21 @@ func PrintNodeExecInfo(node *capacitor.Node, wkl int, nodesInfo capacitor.NodesI
 	result := executor.Execute(*node.Config, nodeInfo.WKL)
 	metSLO := result.SLO <= slo
 	right := nodeInfo.Candidate == metSLO
+	if metSLO {
+		e, has := (*bestPrice)[nodeInfo.WKL]
+		if has {
+			if e.Config == nil || e.Config.Price() > (*node).Config.Price() {
+				(*bestPrice)[nodeInfo.WKL] = ExecInfo{node.Config, right}
+			}
+		} else {
+			(*bestPrice)[nodeInfo.WKL] = ExecInfo{node.Config, right}
+		}
+	} else {
+		_, has := (*bestPrice)[nodeInfo.WKL]
+		if !has {
+			(*bestPrice)[nodeInfo.WKL] = ExecInfo{nil, right}
+		}
+	}
 	str = fmt.Sprintf("%v{\"wkl\":\"%v\", \"when\":%v, \"exec\":%v, \"cadidate\":%v, \"right\":%v},", str, nodeInfo.WKL, nodeInfo.When, nodeInfo.Exec, nodeInfo.Candidate, right)
 	if wkl == nodesInfo.Workloads-1 {
 		str = fmt.Sprintf("%v]},", str[0:len(str)-1])
