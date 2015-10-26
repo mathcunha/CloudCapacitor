@@ -268,7 +268,7 @@
 					});
 					newTable = newTable + '</tbody></table>';
 					$( "#panelFullTrace" ).append(newTable);
-			      		showSuccessMessage('Done! <a href="javascript:generateDSpace()" style="color:green"> Get DSpace</a>')
+			      		showSuccessMessage('Done! <a href="javascript:generateDSpace()" style="color:green"> View DSpace</a>')
 
 				}
 			      , "json" );
