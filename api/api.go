@@ -54,7 +54,7 @@ func getPort() string {
 	return ":" + port
 }
 
-func drawDeploymentSpace(w http.ResponseWriter, r *http.Request) {
+func NodesToDOT(r *http.Request) (graph string) {
 	var config struct {
 		Slo      float32 `json:"slo"`
 		Price    float32 `json:"price"`
@@ -80,10 +80,20 @@ func drawDeploymentSpace(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	dspace := capacitor.NewDeploymentSpace(&vms, config.Price, config.Size)
+	graph = capacitor.NodesToDOT(dspace.CapacityBy(config.Mode))
+	return
+}
 
-	graph := capacitor.NodesToDOT(dspace.CapacityBy(config.Mode))
+func drawDeploymentSpace(w http.ResponseWriter, r *http.Request) {
+	graph := NodesToDOT(r)
 	w.Header().Set("Content-Type", "text/plain")
 	fmt.Fprintf(w, "%v", callGraphviz(graph))
+}
+
+func deploymentSpaceAsDOT(w http.ResponseWriter, r *http.Request) {
+	graph := NodesToDOT(r)
+	w.Header().Set("Content-Type", "text/plain")
+	fmt.Fprintf(w, "%v", graph)
 }
 
 func callGraphviz(graph string) string {
@@ -129,7 +139,9 @@ func getVMTypes(file string, excludedVMs []int) (vms []capacitor.VM, err error) 
 
 func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 	a_path := strings.Split(r.URL.Path, "/")
-	if "draw" == a_path[4] {
+	if "dot" == a_path[4] {
+		deploymentSpaceAsDOT(w, r)
+	} else if "draw" == a_path[4] {
 		drawDeploymentSpace(w, r)
 	} else {
 		var config struct {

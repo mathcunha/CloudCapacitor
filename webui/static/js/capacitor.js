@@ -90,6 +90,28 @@
 		$('html,body').animate({scrollTop: aTag.offset().top},'slow');
 	}
 
+	function generateDSpace(){
+		showSuccessMessage('Generating graph...')
+			$.post( "/api/v1/capacitor/dot", $( "#dspaceParam" ).val(),
+					function( data ) {
+						if(data == 'ERROR'){
+							showWarningMessage('Error generating graph. The service is probably down');
+							panel = '<div class=\"alert alert-info alert-dismissible\" role=\"alert\"><button type=\"button\" class=\"close\" data-dismiss=\"alert\" aria-label=\"Close\"><span aria-hidden=\"true\">&times;</span></button><pre>';
+							panel = panel + data
+				panel = panel + '</pre></div>'
+				$("#mainAlertPanel").append(panel);
+						}
+						else{
+							showSuccessMessage('Done!')
+							var svg = Viz(data, "svg");
+							console.log(svg)
+							panel = '<div class=\"alert alert-info alert-dismissible\" role=\"alert\"><button type=\"button\" class=\"close\" data-dismiss=\"alert\" aria-label=\"Close\"><span aria-hidden=\"true\">&times;</span></button><hr>'+svg;
+							$("#mainAlertPanel").append(panel);
+						}
+					}
+					, "text" );
+	}
+
 	function downloadDeploymentSpaceNew(){
 		$.ajax({
 			type:"POST",
@@ -247,7 +269,7 @@
 					});
 					newTable = newTable + '</tbody></table>';
 					$( "#panelFullTrace" ).append(newTable);
-			      		showSuccessMessage('Done! <a href="javascript:downloadDeploymentSpace()" style="color:green"> Get DSpace</a>')
+			      		showSuccessMessage('Done! <a href="javascript:generateDSpace()" style="color:green"> Get DSpace</a>')
 
 				}
 			      , "json" );
