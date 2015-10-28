@@ -375,24 +375,30 @@ func (p *Policy) selectWorkload(nodesInfo *NodesInfo, key string, result *Result
 		//log.Printf("hybrid WKL cpu:%v, mem:%v  choosing :%v", result.CPU, result.Mem, wklPolicy)
 		return policy.selectWorkload(nodesInfo, key, result, slo)
 	case Sensitive:
-		wklPolicy := Conservative
+		step := wkls[len(wkls)/2]
 		if result != nil {
 			passed := result.SLO <= slo
-			delta := math.Abs(float64(result.SLO - slo))
-			delta = delta / float64(slo)
-
+			delta := math.Abs(float64((result.SLO - slo) / slo))
 			if delta >= HighUsage {
-				wklPolicy = Pessimistic
+				step = 2
 			} else if delta <= LowUsage {
-				wklPolicy = Optimistic
+				step = 0
 			} else {
-				wklPolicy = Conservative
+				step = 1
 			}
-			log.Printf("sensitive WKL passed:%v delta:%v  choosing :%v", passed, delta, wklPolicy)
+			if passed {
+				step = len(wkls) - 1 - step
+				if step <= 0 {
+					step = 0
+				}
+			} else {
+				if step >= len(wkls) {
+					step = len(wkls) - 1
+				}
+			}
+			//log.Printf("sensitive WKL key:%v passed:%v delta:%.4f choosing:%v", key, passed, delta, step)
 		}
-		policy := new(Policy)
-		policy.wklPolicy = wklPolicy
-		return policy.selectWorkload(nodesInfo, key, result, slo)
+		return wkls[step]
 	}
 	return
 }
@@ -425,16 +431,16 @@ func (p *Policy) selectCapacityLevel(nodesInfo *NodesInfo, key string, nodes *No
 		//log.Printf("hybrid LEVEL cpu:%v, mem:%v  choosing :%v", result.CPU, result.Mem, levelPolicy)
 		return policy.selectCapacityLevel(nodesInfo, key, nodes, result, slo)
 	case Sensitive:
-		step := levels[len(levels)/2]
+		step := levels[0]
 		if result != nil {
 			passed := result.SLO <= slo
 			delta := math.Abs(float64((result.SLO - slo) / slo))
 			if delta >= HighUsage {
 				step = 2
 			} else if delta <= LowUsage {
-				step = 1
-			} else {
 				step = 0
+			} else {
+				step = 1
 			}
 			if passed {
 				step = len(levels) - 1 - step
@@ -446,7 +452,7 @@ func (p *Policy) selectCapacityLevel(nodesInfo *NodesInfo, key string, nodes *No
 					step = len(levels) - 1
 				}
 			}
-			log.Printf("sensitive LEVEL key:%v passed:%v delta:%.4f choosing:%v", key, passed, delta, step)
+			//log.Printf("sensitive LEVEL key:%v passed:%v delta:%.4f choosing:%v", key, passed, delta, step)
 		}
 		return levels[step]
 	}

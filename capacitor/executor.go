@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	HighUsage = 0.3
+	HighUsage = 0.4
 	LowUsage  = 0.1
 )
 
