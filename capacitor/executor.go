@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	HighUsage = 70
-	LowUsage  = 40
+	HighUsage = 0.3
+	LowUsage  = 0.1
 )
 
 type Result struct {
