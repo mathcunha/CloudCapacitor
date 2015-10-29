@@ -379,9 +379,9 @@ func (p *Policy) selectWorkload(nodesInfo *NodesInfo, key string, result *Result
 		if result != nil {
 			passed := result.SLO <= slo
 			delta := math.Abs(float64((result.SLO - slo) / slo))
-			if delta >= HighUsage {
+			if delta >= HighDelta {
 				step = 2
-			} else if delta <= LowUsage {
+			} else if delta <= LowDelta {
 				step = 0
 			} else {
 				step = 1
@@ -435,9 +435,9 @@ func (p *Policy) selectCapacityLevel(nodesInfo *NodesInfo, key string, nodes *No
 		if result != nil {
 			passed := result.SLO <= slo
 			delta := math.Abs(float64((result.SLO - slo) / slo))
-			if delta >= HighUsage {
+			if delta >= HighDelta {
 				step = 2
-			} else if delta <= LowUsage {
+			} else if delta <= LowDelta {
 				step = 0
 			} else {
 				step = 1
