@@ -375,7 +375,7 @@ func (p *Policy) selectWorkload(nodesInfo *NodesInfo, key string, result *Result
 		//log.Printf("hybrid WKL cpu:%v, mem:%v  choosing :%v", result.CPU, result.Mem, wklPolicy)
 		return policy.selectWorkload(nodesInfo, key, result, slo)
 	case Sensitive:
-		step := wkls[len(wkls)/2]
+		step := len(wkls) / 2
 		if result != nil {
 			passed := result.SLO <= slo
 			delta := math.Abs(float64((result.SLO - slo) / slo))
@@ -431,7 +431,7 @@ func (p *Policy) selectCapacityLevel(nodesInfo *NodesInfo, key string, nodes *No
 		//log.Printf("hybrid LEVEL cpu:%v, mem:%v  choosing :%v", result.CPU, result.Mem, levelPolicy)
 		return policy.selectCapacityLevel(nodesInfo, key, nodes, result, slo)
 	case Sensitive:
-		step := levels[0]
+		step := 0
 		if result != nil {
 			passed := result.SLO <= slo
 			delta := math.Abs(float64((result.SLO - slo) / slo))
