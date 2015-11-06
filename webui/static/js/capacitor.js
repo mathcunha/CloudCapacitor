@@ -250,7 +250,7 @@
 							
 							right = '<i class="fa fa-thumbs-o-down fa-fw" style="color:red">'
 							if (wklInfo.right){
-								//right = '<i class="fa fa-thumbs-o-up fa-fw" style="color:green">'
+								right = '<i class="fa fa-thumbs-o-up fa-fw" style="color:green">'
 							}
 							cadidate = 'red'
 							if (wklInfo.cadidate){
