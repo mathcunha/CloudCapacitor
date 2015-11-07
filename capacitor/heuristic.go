@@ -375,30 +375,20 @@ func (p *Policy) selectWorkload(nodesInfo *NodesInfo, key string, result *Result
 		//log.Printf("hybrid WKL cpu:%v, mem:%v  choosing :%v", result.CPU, result.Mem, wklPolicy)
 		return policy.selectWorkload(nodesInfo, key, result, slo)
 	case Sensitive:
-		step := len(wkls) / 2
+		wklPolicy := Conservative
 		if result != nil {
-			passed := result.SLO <= slo
 			delta := math.Abs(float64((result.SLO - slo) / slo))
 			if delta >= HighDelta {
-				step = 2
+				wklPolicy = Pessimistic
 			} else if delta <= LowDelta {
-				step = 0
-			} else {
-				step = 1
+				wklPolicy = Optimistic
 			}
-			if passed {
-				step = len(wkls) - 1 - step
-				if step <= 0 {
-					step = 0
-				}
-			} else {
-				if step >= len(wkls) {
-					step = len(wkls) - 1
-				}
-			}
-			//log.Printf("sensitive WKL key:%v passed:%v delta:%.4f choosing:%v", key, passed, delta, step)
+
 		}
-		return wkls[step]
+		policy := new(Policy)
+		policy.wklPolicy = wklPolicy
+		//log.Printf("sensitive WKL key:%v passed:%v delta:%.4f choosing:%v", key, passed, delta, step)
+		return policy.selectWorkload(nodesInfo, key, result, slo)
 	}
 	return
 }
@@ -424,6 +414,8 @@ func (p *Policy) selectCapacityLevel(nodesInfo *NodesInfo, key string, nodes *No
 				levelPolicy = Pessimistic
 			} else if result.CPU <= LowUsage || result.Mem <= LowUsage {
 				levelPolicy = Optimistic
+			} else {
+				levelPolicy = Conservative
 			}
 		}
 		policy := new(Policy)
@@ -431,30 +423,21 @@ func (p *Policy) selectCapacityLevel(nodesInfo *NodesInfo, key string, nodes *No
 		//log.Printf("hybrid LEVEL cpu:%v, mem:%v  choosing :%v", result.CPU, result.Mem, levelPolicy)
 		return policy.selectCapacityLevel(nodesInfo, key, nodes, result, slo)
 	case Sensitive:
-		step := 0
+		levelPolicy := Optimistic
 		if result != nil {
-			passed := result.SLO <= slo
 			delta := math.Abs(float64((result.SLO - slo) / slo))
 			if delta >= HighDelta {
-				step = 2
+				levelPolicy = Pessimistic
 			} else if delta <= LowDelta {
-				step = 0
+				levelPolicy = Optimistic
 			} else {
-				step = 1
+				levelPolicy = Conservative
 			}
-			if passed {
-				step = len(levels) - 1 - step
-				if step <= 0 {
-					step = 0
-				}
-			} else {
-				if step >= len(levels) {
-					step = len(levels) - 1
-				}
-			}
-			//log.Printf("sensitive LEVEL key:%v passed:%v delta:%.4f choosing:%v", key, passed, delta, step)
 		}
-		return levels[step]
+		policy := new(Policy)
+		policy.levelPolicy = levelPolicy
+		//log.Printf("sensitive LEVEL key:%v passed:%v delta:%.4f choosing:%v", key, passed, delta, step)
+		return policy.selectCapacityLevel(nodesInfo, key, nodes, result, slo)
 	}
 	return
 }

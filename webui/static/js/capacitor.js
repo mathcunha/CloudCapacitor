@@ -240,7 +240,12 @@
 					jQuery.each( data.spaceInfo, function( i, val ) {
 						newTable = newTable + '<tr> <td class="deactive">('+val.size+') '+val.name+'</td>';
 						jQuery.each( val.wkl, function( j, wklInfo) {
-							newTable = newTable + '<td class="deactive" id="fullTrace'+wklInfo.when+'">'
+							td_class = 'deactive'
+							if (!wklInfo.right){
+								td_class = 'td-error'
+							}
+
+							newTable = newTable + '<td class="'+td_class+'" id="fullTrace'+wklInfo.when+'">'
 
 							executed = 'fa-info-circle'
 							if (wklInfo.exec){
@@ -248,10 +253,6 @@
 								newTable = newTable + '<a name="fullTraceExec'+ wklInfo.when +'"></a>'
 							}
 							
-							right = '<i class="fa fa-thumbs-o-down fa-fw" style="color:red">'
-							if (wklInfo.right){
-								right = '<i class="fa fa-thumbs-o-up fa-fw" style="color:green">'
-							}
 							cadidate = 'red'
 							if (wklInfo.cadidate){
 								cadidate  = 'green'
@@ -262,7 +263,7 @@
 
 							newTable = newTable + wklInfo.when;
 
-							newTable = newTable + right + '</td>'
+							newTable = newTable + '</td>'
 						});
 						newTable = newTable + '</tr>'
 					});

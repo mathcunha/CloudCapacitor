@@ -356,3 +356,6 @@ table.dataTable thead .sorting:after {
 .td-marked {
 	background-color: #c6c6c6;
 }
+.td-error {
+	background-color: #FF8C89;
+}
