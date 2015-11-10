@@ -375,20 +375,30 @@ func (p *Policy) selectWorkload(nodesInfo *NodesInfo, key string, result *Result
 		//log.Printf("hybrid WKL cpu:%v, mem:%v  choosing :%v", result.CPU, result.Mem, wklPolicy)
 		return policy.selectWorkload(nodesInfo, key, result, slo)
 	case Sensitive:
-		wklPolicy := Conservative
+		policy := Optimistic
 		if result != nil {
+			passed := result.SLO <= slo
 			delta := math.Abs(float64((result.SLO - slo) / slo))
-			if delta >= HighDelta {
-				wklPolicy = Pessimistic
-			} else if delta <= LowDelta {
-				wklPolicy = Optimistic
+			policy = Conservative
+			if passed {
+				if delta >= HighDelta {
+					policy = Optimistic
+				} else if delta <= LowDelta {
+					policy = Pessimistic
+				}
+			} else {
+				if delta >= HighDelta {
+					policy = Pessimistic
+				} else if delta <= LowDelta {
+					policy = Optimistic
+				}
 			}
 
+			//log.Printf("sensitive WKL key:%v passed:%v result:%.0f delta:%.4f choosing:%v", key, passed, result.SLO, delta, policy)
 		}
-		policy := new(Policy)
-		policy.wklPolicy = wklPolicy
-		//log.Printf("sensitive WKL key:%v passed:%v delta:%.4f choosing:%v", key, passed, delta, step)
-		return policy.selectWorkload(nodesInfo, key, result, slo)
+		lPolicy := new(Policy)
+		lPolicy.wklPolicy = policy
+		return lPolicy.selectWorkload(nodesInfo, key, result, slo)
 	}
 	return
 }
@@ -423,21 +433,30 @@ func (p *Policy) selectCapacityLevel(nodesInfo *NodesInfo, key string, nodes *No
 		//log.Printf("hybrid LEVEL cpu:%v, mem:%v  choosing :%v", result.CPU, result.Mem, levelPolicy)
 		return policy.selectCapacityLevel(nodesInfo, key, nodes, result, slo)
 	case Sensitive:
-		levelPolicy := Optimistic
+		policy := Optimistic
 		if result != nil {
+			passed := result.SLO <= slo
 			delta := math.Abs(float64((result.SLO - slo) / slo))
-			if delta >= HighDelta {
-				levelPolicy = Pessimistic
-			} else if delta <= LowDelta {
-				levelPolicy = Optimistic
+			policy = Conservative
+			if passed {
+				if delta >= HighDelta {
+					policy = Optimistic
+				} else if delta <= LowDelta {
+					policy = Pessimistic
+				}
 			} else {
-				levelPolicy = Conservative
+				if delta >= HighDelta {
+					policy = Pessimistic
+				} else if delta <= LowDelta {
+					policy = Optimistic
+				}
 			}
+
+			//log.Printf("sensitive LEVEL key:%v passed:%v result:%.0f delta:%.4f choosing:%v", key, passed, result.SLO, delta, policy)
 		}
-		policy := new(Policy)
-		policy.levelPolicy = levelPolicy
-		//log.Printf("sensitive LEVEL key:%v passed:%v delta:%.4f choosing:%v", key, passed, delta, step)
-		return policy.selectCapacityLevel(nodesInfo, key, nodes, result, slo)
+		lPolicy := new(Policy)
+		lPolicy.levelPolicy = policy
+		return lPolicy.selectCapacityLevel(nodesInfo, key, nodes, result, slo)
 	}
 	return
 }
