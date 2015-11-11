@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	HighUsage = 70
-	LowUsage  = 40
+	HighUsage = 80
+	LowUsage  = 50
 	HighDelta = 0.6
 	LowDelta  = 0.2
 )

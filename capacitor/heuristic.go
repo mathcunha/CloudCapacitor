@@ -14,6 +14,7 @@ const (
 	Optimistic   = "optimistic"
 	Hybrid       = "hybrid"
 	Sensitive    = "sensitive"
+	Adaptative   = "adaptative"
 )
 
 const (
@@ -61,12 +62,12 @@ type Policy struct {
 
 func NewPolicy(c *Capacitor, levelPolicy string, wklPolicy string, equiBehavior int) (h *Policy) {
 	switch levelPolicy {
-	case Conservative, Pessimistic, Optimistic, Hybrid, Sensitive:
+	case Conservative, Pessimistic, Optimistic, Hybrid, Sensitive, Adaptative:
 	default:
 		log.Panicf("NewPolicy: levelPolicy not available:%v", levelPolicy)
 	}
 	switch wklPolicy {
-	case Conservative, Pessimistic, Optimistic, Hybrid, Sensitive:
+	case Conservative, Pessimistic, Optimistic, Hybrid, Sensitive, Adaptative:
 	default:
 		log.Panicf("NewPolicy: wklPolicy not available:%v", wklPolicy)
 	}
@@ -399,6 +400,44 @@ func (p *Policy) selectWorkload(nodesInfo *NodesInfo, key string, result *Result
 		lPolicy := new(Policy)
 		lPolicy.wklPolicy = policy
 		return lPolicy.selectWorkload(nodesInfo, key, result, slo)
+	case Adaptative:
+		policy := Optimistic
+		if result != nil {
+			passed := result.SLO <= slo
+			delta := math.Abs(float64((result.SLO - slo) / slo))
+			policy = Conservative
+			isHigh := result.CPU >= HighUsage || result.Mem >= HighUsage
+			isLow := result.CPU <= LowUsage || result.Mem <= LowUsage
+			if passed {
+				if delta >= HighDelta {
+					policy = Optimistic
+					if isHigh {
+						policy = Conservative
+					}
+				} else if delta <= LowDelta {
+					policy = Pessimistic
+					if isLow {
+						policy = Conservative
+					}
+				}
+			} else {
+				if delta >= HighDelta {
+					policy = Pessimistic
+					if isLow {
+						policy = Conservative
+					}
+				} else if delta <= LowDelta {
+					policy = Optimistic
+					if isHigh {
+						policy = Conservative
+					}
+				}
+			}
+			//log.Printf("sensitive WKL key:%v passed:%v result:%.0f delta:%.4f choosing:%v", key, passed, result.SLO, delta, policy)
+		}
+		lPolicy := new(Policy)
+		lPolicy.wklPolicy = policy
+		return lPolicy.selectWorkload(nodesInfo, key, result, slo)
 	}
 	return
 }
@@ -453,6 +492,44 @@ func (p *Policy) selectCapacityLevel(nodesInfo *NodesInfo, key string, nodes *No
 			}
 
 			//log.Printf("sensitive LEVEL key:%v passed:%v result:%.0f delta:%.4f choosing:%v", key, passed, result.SLO, delta, policy)
+		}
+		lPolicy := new(Policy)
+		lPolicy.levelPolicy = policy
+		return lPolicy.selectCapacityLevel(nodesInfo, key, nodes, result, slo)
+	case Adaptative:
+		policy := Optimistic
+		if result != nil {
+			passed := result.SLO <= slo
+			delta := math.Abs(float64((result.SLO - slo) / slo))
+			policy = Conservative
+			isHigh := result.CPU >= HighUsage || result.Mem >= HighUsage
+			isLow := result.CPU <= LowUsage || result.Mem <= LowUsage
+			if passed {
+				if delta >= HighDelta {
+					policy = Optimistic
+					if isHigh {
+						policy = Conservative
+					}
+				} else if delta <= LowDelta {
+					policy = Pessimistic
+					if isLow {
+						policy = Conservative
+					}
+				}
+			} else {
+				if delta >= HighDelta {
+					policy = Pessimistic
+					if isLow {
+						policy = Conservative
+					}
+				} else if delta <= LowDelta {
+					policy = Optimistic
+					if isHigh {
+						policy = Conservative
+					}
+				}
+			}
+			//log.Printf("sensitive WKL key:%v passed:%v result:%.0f delta:%.4f choosing:%v", key, passed, result.SLO, delta, policy)
 		}
 		lPolicy := new(Policy)
 		lPolicy.levelPolicy = policy
