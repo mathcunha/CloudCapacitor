@@ -193,7 +193,7 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 		case "bf":
 			h = capacitor.NewBrutalForce(&c)
 		case "sp":
-			h = capacitor.NewShortestPath(&c)
+			h = capacitor.NewShortestPath(&c, config.EquiBehavior)
 		default:
 			h = capacitor.NewPolicy(&c, config.Configuration, config.WKL, config.EquiBehavior)
 		}

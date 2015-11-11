@@ -111,14 +111,14 @@ func (pNodes *NodesInfo) MarkReject(n *Node, metslo bool, exec int, cWKL int) {
 	}
 }
 
-func (pNodes *NodesInfo) Mark(key string, metslo bool, exec int) {
+func (pNodes *NodesInfo) Mark(key string, metslo bool, exec int, executed bool) {
 	_, cWKL := SplitMatrixKey(key)
 	//fmt.Printf("INI MARK\n")
 	//fmt.Printf("%v ? %v\n", key, metslo)
 	matrix := (*pNodes).Matrix
 
 	matrix[key].When = exec
-	matrix[key].Exec = true
+	matrix[key].Exec = executed
 
 	if metslo {
 		matrix[key].Candidate = true

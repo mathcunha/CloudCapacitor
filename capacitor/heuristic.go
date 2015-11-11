@@ -43,7 +43,8 @@ type BrutalForce struct {
 
 //Find the shortest path to Mark all configurations and workloads
 type ShortestPath struct {
-	c *Capacitor
+	c            *Capacitor
+	equiBehavior int
 }
 
 //Explorer
@@ -79,8 +80,8 @@ func NewPolicy(c *Capacitor, levelPolicy string, wklPolicy string, equiBehavior 
 	return &(Policy{c, levelPolicy, wklPolicy, equiBehavior})
 }
 
-func NewShortestPath(c *Capacitor) (h *ShortestPath) {
-	h = &ShortestPath{c}
+func NewShortestPath(c *Capacitor, equiBehavior int) (h *ShortestPath) {
+	h = &ShortestPath{c, equiBehavior}
 	return
 }
 
@@ -140,7 +141,19 @@ func (h *ShortestPath) Exec(mode string, slo float32, wkls []string) (path ExecI
 				if !(node.When != -1) {
 					localNodesInfo := nodesInfo.Clone()
 					result := h.c.Executor.Execute(*node.Config, node.WKL)
-					localNodesInfo.Mark(key, result.SLO <= slo, execInfo.Execs)
+					localNodesInfo.Mark(key, result.SLO <= slo, execInfo.Execs, true)
+					//Equivalents Actions
+					if h.equiBehavior == Mark {
+						equivalent := nodes.Equivalents(&node.Node)
+						_, wkl := SplitMatrixKey(key)
+						for _, lNode := range equivalent {
+							lKey := GetMatrixKey(lNode.ID, wkl)
+							lNodeInfo := nodesInfo.Matrix[lKey]
+							if !(lNodeInfo.When != -1) {
+								localNodesInfo.Mark(lKey, result.SLO <= slo, execInfo.Execs, false)
+							}
+						}
+					}
 					if localNodesLeft := h.c.NodesLeft(localNodesInfo); localNodesLeft != 0 {
 						if nodesLeft > localNodesLeft {
 							nodesLeft = localNodesLeft
@@ -193,7 +206,7 @@ func (h *ExplorePath) Explore(slo float32, key string, nodesInfo *NodesInfo, exe
 	execInfo.Path = fmt.Sprintf("%v%v->", execInfo.Path, key)
 	nodeInfo := nodesInfo.Matrix[key]
 	result := h.c.Executor.Execute(*nodeInfo.Config, nodeInfo.WKL)
-	nodesInfo.Mark(key, result.SLO <= slo, execInfo.Execs)
+	nodesInfo.Mark(key, result.SLO <= slo, execInfo.Execs, true)
 	if h.c.HasMore(nodesInfo) {
 		if execInfo.Execs < maxExecs {
 			for localKey, _ := range nodesInfo.Matrix {
@@ -238,7 +251,7 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 				//log.Printf("[Policy.Exec] WKL:%v Result:%v\n", wkls[wkl], result)
 				execInfo.Path = fmt.Sprintf("%v%v->", execInfo.Path, key)
 				execInfo.Execs++
-				(&nodesInfo).Mark(key, result.SLO <= slo, execInfo.Execs)
+				(&nodesInfo).Mark(key, result.SLO <= slo, execInfo.Execs, true)
 			}
 
 			//Equivalents Actions
@@ -254,7 +267,7 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 						//log.Printf("[Policy.Exec] WKL:%v Result:%v\n", wkls[wkl], result)
 						execInfo.Path = fmt.Sprintf("%v%v->", execInfo.Path, key)
 						execInfo.Execs++
-						(&nodesInfo).Mark(key, result.SLO <= slo, execInfo.Execs)
+						(&nodesInfo).Mark(key, result.SLO <= slo, execInfo.Execs, true)
 					}
 				}
 			case Mark:
@@ -263,7 +276,7 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 					key = GetMatrixKey(node.ID, wkl)
 					nodeInfo = nodesInfo.Matrix[key]
 					if !(nodeInfo.When != -1) {
-						(&nodesInfo).Mark(key, result.SLO <= slo, execInfo.Execs)
+						(&nodesInfo).Mark(key, result.SLO <= slo, execInfo.Execs, false)
 					}
 				}
 
