@@ -162,6 +162,17 @@ func (nodes *Nodes) Equivalents(n *Node) Nodes {
 	return equivalents
 }
 
+func (nodes *Nodes) FromLevel(n *Node) Nodes {
+	var equivalents Nodes
+	for _, e := range *nodes {
+		if n.Level == e.Level {
+			equivalents = append(equivalents, e)
+		}
+	}
+	sort.Sort(bySize{equivalents})
+	return equivalents
+}
+
 func (dspace *DeploymentSpace) buildNodes(prop string) *map[string]Nodes {
 	mapa := make(map[string]Nodes)
 
