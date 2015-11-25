@@ -376,12 +376,18 @@ func (p *Policy) selectWorkload(nodesInfo *NodesInfo, key string, result *Result
 	case Optimistic:
 		wklID = wkls[len(wkls)-1]
 	case Hybrid:
-		wklPolicy := Conservative
+		wklPolicy := Pessimistic
 		if result != nil {
-			if result.CPU >= HighUsage || result.Mem >= HighUsage {
+			passed := result.SLO <= slo
+			if !passed && result.CPU <= LowUsage && result.Mem <= LowUsage {
+				//no configuration fits this slo
 				wklPolicy = Pessimistic
-			} else if result.CPU <= LowUsage || result.Mem <= LowUsage {
-				wklPolicy = Optimistic
+			} else {
+				if result.CPU >= HighUsage || result.Mem >= HighUsage {
+					wklPolicy = Pessimistic
+				} else if result.CPU <= LowUsage || result.Mem <= LowUsage {
+					wklPolicy = Optimistic
+				}
 			}
 		}
 		policy := new(Policy)
@@ -472,12 +478,18 @@ func (p *Policy) selectCapacityLevel(nodesInfo *NodesInfo, key string, nodes *No
 	case Hybrid:
 		levelPolicy := Optimistic
 		if result != nil {
-			if result.CPU >= HighUsage || result.Mem >= HighUsage {
+			passed := result.SLO <= slo
+			if !passed && result.CPU <= LowUsage && result.Mem <= LowUsage {
+				//no configuration fits this slo
 				levelPolicy = Pessimistic
-			} else if result.CPU <= LowUsage || result.Mem <= LowUsage {
-				levelPolicy = Optimistic
 			} else {
-				levelPolicy = Conservative
+				if result.CPU >= HighUsage || result.Mem >= HighUsage {
+					levelPolicy = Pessimistic
+				} else if result.CPU <= LowUsage || result.Mem <= LowUsage {
+					levelPolicy = Optimistic
+				} else {
+					levelPolicy = Conservative
+				}
 			}
 		}
 		policy := new(Policy)
