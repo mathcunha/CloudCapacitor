@@ -15,6 +15,7 @@ const (
 	Hybrid       = "hybrid"
 	Sensitive    = "sensitive"
 	Adaptative   = "adaptative"
+	Truth        = "truth"
 )
 
 const (
@@ -64,12 +65,12 @@ type Policy struct {
 
 func NewPolicy(c *Capacitor, levelPolicy string, wklPolicy string, equiBehavior int, isCapacityFirst bool) (h *Policy) {
 	switch levelPolicy {
-	case Conservative, Pessimistic, Optimistic, Hybrid, Sensitive, Adaptative:
+	case Conservative, Pessimistic, Optimistic, Hybrid, Sensitive, Adaptative, Truth:
 	default:
 		log.Panicf("NewPolicy: levelPolicy not available:%v", levelPolicy)
 	}
 	switch wklPolicy {
-	case Conservative, Pessimistic, Optimistic, Hybrid, Sensitive, Adaptative:
+	case Conservative, Pessimistic, Optimistic, Hybrid, Sensitive, Adaptative, Truth:
 	default:
 		log.Panicf("NewPolicy: wklPolicy not available:%v", wklPolicy)
 	}
@@ -473,6 +474,21 @@ func (p *Policy) selectWorkload(nodesInfo *NodesInfo, key string, result *Result
 		lPolicy := new(Policy)
 		lPolicy.wklPolicy = policy
 		return lPolicy.selectWorkload(nodesInfo, key, result, slo)
+	case Truth:
+		policy := Pessimistic
+		if result != nil {
+			passed := result.SLO <= slo
+			delta := math.Abs(float64(result.SLO / slo))
+			if !passed {
+				if result.CPU <= LowUsage && result.Mem <= LowUsage {
+					policy = Optimistic
+				}
+			}
+			log.Printf("truth WKL key:%v passed:%v result:%.0f delta:%.4f cpu:%v mem:%v policy:%v", key, passed, result.SLO, delta, result.CPU, result.Mem, policy)
+		}
+		lPolicy := new(Policy)
+		lPolicy.wklPolicy = policy
+		return lPolicy.selectWorkload(nodesInfo, key, result, slo)
 	}
 	return
 }
@@ -575,6 +591,22 @@ func (p *Policy) selectCapacityLevel(nodesInfo *NodesInfo, key string, nodes *No
 		lPolicy := new(Policy)
 		lPolicy.levelPolicy = policy
 		return lPolicy.selectCapacityLevel(nodesInfo, key, nodes, result, slo)
+	case Truth:
+		policy := Optimistic
+		if result != nil {
+			passed := result.SLO <= slo
+			delta := math.Abs(float64(result.SLO / slo))
+			if !passed {
+				if result.CPU <= LowUsage && result.Mem <= LowUsage {
+					policy = Pessimistic
+				}
+			}
+			log.Printf("truth level key:%v passed:%v result:%.0f delta:%.4f cpu:%v mem:%v policy:%v", key, passed, result.SLO, delta, result.CPU, result.Mem, policy)
+		}
+		lPolicy := new(Policy)
+		lPolicy.levelPolicy = policy
+		return lPolicy.selectCapacityLevel(nodesInfo, key, nodes, result, slo)
+
 	}
 	return
 }

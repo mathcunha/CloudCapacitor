@@ -11,8 +11,8 @@ import (
 const (
 	HighUsage = 90
 	LowUsage  = 70
-	HighDelta = 0.6
-	LowDelta  = 0.2
+	HighDelta = 0.8
+	LowDelta  = 0.6
 )
 
 type Result struct {
