@@ -55,13 +55,14 @@ type ExplorePath struct {
 
 //the policies proposed at thesis
 type Policy struct {
-	c            *Capacitor
-	levelPolicy  string
-	wklPolicy    string
-	equiBehavior int
+	c               *Capacitor
+	levelPolicy     string
+	wklPolicy       string
+	equiBehavior    int
+	isCapacityFirst bool
 }
 
-func NewPolicy(c *Capacitor, levelPolicy string, wklPolicy string, equiBehavior int) (h *Policy) {
+func NewPolicy(c *Capacitor, levelPolicy string, wklPolicy string, equiBehavior int, isCapacityFirst bool) (h *Policy) {
 	switch levelPolicy {
 	case Conservative, Pessimistic, Optimistic, Hybrid, Sensitive, Adaptative:
 	default:
@@ -77,7 +78,7 @@ func NewPolicy(c *Capacitor, levelPolicy string, wklPolicy string, equiBehavior 
 	default:
 		log.Panicf("NewPolicy: equiBehavior not available:%v", equiBehavior)
 	}
-	return &(Policy{c, levelPolicy, wklPolicy, equiBehavior})
+	return &(Policy{c, levelPolicy, wklPolicy, equiBehavior, isCapacityFirst})
 }
 
 func NewShortestPath(c *Capacitor, equiBehavior int) (h *ShortestPath) {
@@ -281,18 +282,31 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 				}
 
 			}
-			//select capacity level
-			oldLevel := level
-			level = h.selectCapacityLevel(&nodesInfo, key, &nodes, &result, slo)
 
-			//select workload
-			if level == -1 {
-				level = oldLevel
+			if h.isCapacityFirst {
+				//select capacity level
+				oldLevel := level
+				level = h.selectCapacityLevel(&nodesInfo, key, &nodes, &result, slo)
+
+				//select workload
+				if level == -1 {
+					level = oldLevel
+					wkl = h.selectWorkload(&nodesInfo, key, &result, slo)
+				}
+			} else {
+				//select workload
+				oldWKL := wkl
 				wkl = h.selectWorkload(&nodesInfo, key, &result, slo)
+
+				//select capacity level
+				if wkl == -1 {
+					wkl = oldWKL
+					level = h.selectCapacityLevel(&nodesInfo, key, &nodes, &result, slo)
+				}
 			}
 
 			//select other starting point
-			if wkl == -1 {
+			if wkl == -1 || level == -1 {
 				localKey := h.selectStartingPoint(&nodesInfo, &nodes)
 				if localKey != "" {
 					level = h.selectCapacityLevel(&nodesInfo, localKey, &nodes, &result, slo)
@@ -304,7 +318,9 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 			}
 
 			//next config
-			key, nodeInfo = h.NextConfig(&nodesInfo, nodes, level, wkl)
+			if level != -1 {
+				key, nodeInfo = h.NextConfig(&nodesInfo, nodes, level, wkl)
+			}
 		}
 		//log.Printf("[Policy.Exec] Category:%v Execs:%v", cat, execInfo.execs)
 	}

@@ -145,19 +145,20 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 		drawDeploymentSpace(w, r)
 	} else {
 		var config struct {
-			Slo           float32 `json:"slo"`
-			Price         float32 `json:"price"`
-			Size          int     `json:"instances"`
-			Mode          string  `json:"mode"`
-			Category      bool    `json:"category"`
-			Demand        []int   `json:"demand"`
-			VMtype        []int   `json:"vmtype"`
-			WKL           string  `json:"wkl"`
-			Configuration string  `json:"configuration"`
-			Heuristic     string  `json:"heuristic"`
-			MaxExecs      int     `json:"maxExecs"`
-			EquiBehavior  int     `json:"equiBehavior"`
-			App           string  `json:"app"`
+			Slo             float32 `json:"slo"`
+			Price           float32 `json:"price"`
+			Size            int     `json:"instances"`
+			Mode            string  `json:"mode"`
+			Category        bool    `json:"category"`
+			Demand          []int   `json:"demand"`
+			VMtype          []int   `json:"vmtype"`
+			WKL             string  `json:"wkl"`
+			Configuration   string  `json:"configuration"`
+			Heuristic       string  `json:"heuristic"`
+			MaxExecs        int     `json:"maxExecs"`
+			EquiBehavior    int     `json:"equiBehavior"`
+			App             string  `json:"app"`
+			IsCapacityFirst bool    `json:"isCapacityFirst"`
 		}
 
 		err := json.NewDecoder(r.Body).Decode(&config)
@@ -195,7 +196,7 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 		case "sp":
 			h = capacitor.NewShortestPath(&c, config.EquiBehavior)
 		default:
-			h = capacitor.NewPolicy(&c, config.Configuration, config.WKL, config.EquiBehavior)
+			h = capacitor.NewPolicy(&c, config.Configuration, config.WKL, config.EquiBehavior, config.IsCapacityFirst)
 		}
 
 		wkls := make([]string, len(config.Demand), len(config.Demand))
