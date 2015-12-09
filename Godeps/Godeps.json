@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/mathcunha/CloudCapacitor",
-	"GoVersion": "go1.4.2",
+	"GoVersion": "go1.5",
 	"Deps": [
 		{
 			"ImportPath": "gopkg.in/yaml.v2",
