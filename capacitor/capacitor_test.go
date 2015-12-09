@@ -22,7 +22,7 @@ func TestMarkStrict(t *testing.T) {
 	matrix := buildMatrix([]string{"100", "200", "300", "400", "500", "600", "700", "800", "900", "1000"}, M["c3"])
 
 	clone := matrix.Clone()
-	clone.Mark("1_c3_large#0", true, 1)
+	clone.Mark("1_c3_large#0", true, 1, true)
 
 	if !clone.Matrix["1_c3_2xlarge#0"].Candidate {
 		t.Fail()
@@ -53,13 +53,13 @@ func TestMarkMemShortestPath(t *testing.T) {
 		execs++
 		nodeInfo := nodesInfo.Matrix[key]
 		result := c.Executor.Execute(*nodeInfo.Config, nodeInfo.WKL)
-		(&nodesInfo).Mark(key, result.SLO <= 10000, execs)
+		(&nodesInfo).Mark(key, result.SLO <= 10000, execs, true)
 	}
 
 	t.Logf("%v - BEFORE KEY[2_c3_large#2]", c.NodesLeft(&nodesInfo))
 	nodeInfo := nodesInfo.Matrix["2_c3_large#2"]
 	result := c.Executor.Execute(*nodeInfo.Config, nodeInfo.WKL)
-	(&nodesInfo).Mark("2_c3_large#2", result.SLO <= 10000, execs)
+	(&nodesInfo).Mark("2_c3_large#2", result.SLO <= 10000, execs, true)
 	t.Logf("%v - AFTER KEY[2_c3_large#2]", c.NodesLeft(&nodesInfo))
 }
 
@@ -81,16 +81,16 @@ func TestMarkMem(t *testing.T) {
 	matrix := buildMatrix([]string{"100", "200", "300", "400", "500", "600", "700", "800", "900", "1000"}, M["c3"])
 
 	clone := matrix.Clone()
-	clone.Mark("1_c3_large#2", true, 1)
-	clone.Mark("1_c3_large#1", false, 2)
+	clone.Mark("1_c3_large#2", true, 1, true)
+	clone.Mark("1_c3_large#1", false, 2, true)
 	if c.NodesLeft(clone) != 0 {
 		t.Fail()
 	}
 
 	matrix = buildMatrix([]string{"100", "200", "300", "400", "500", "600", "700", "800", "900", "1000"}, M["m3"])
 	clone = matrix.Clone()
-	clone.Mark("2_m3_medium#1", true, 1)
-	clone.Mark("2_m3_medium#1", false, 2)
+	clone.Mark("2_m3_medium#1", true, 1, true)
+	clone.Mark("2_m3_medium#1", false, 2, true)
 	if clone.Matrix["1_m3_medium#0"].When != -1 {
 		t.Fail()
 	}

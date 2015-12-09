@@ -62,6 +62,8 @@ func NodesToDOT(r *http.Request) (graph string) {
 		Mode     string  `json:"mode"`
 		Category bool    `json:"category"`
 		VMtype   []int   `json:"vmtype"`
+		Demand   []int   `json:"demand"`
+		App      string  `json:"app"`
 	}
 	err := json.NewDecoder(r.Body).Decode(&config)
 	r.Body.Close()
@@ -80,6 +82,24 @@ func NodesToDOT(r *http.Request) (graph string) {
 		return
 	}
 	dspace := capacitor.NewDeploymentSpace(&vms, config.Price, config.Size)
+	if config.Mode == "MaxSLO" {
+		m := capacitor.MockExecutor{"config/" + config.App + "_cpu_mem.csv", nil}
+		err = m.Load()
+		if err != nil {
+			log.Println("ERROR: callCapacitorResource unable to start MockExecutor")
+			return
+		}
+
+		wkls := make([]string, len(config.Demand), len(config.Demand))
+		for i, d := range config.Demand {
+			wkls[i] = strconv.Itoa(d)
+		}
+		slos := []float32{10000, 20000, 30000, 40000, 50000}
+		if config.App == "terasort" {
+			slos = []float32{0.01, 0.02, 0.03, 0.04, 0.05}
+		}
+		dspace = *dspace.CalcMaxSLO(m, wkls, slos)
+	}
 	graph = capacitor.NodesToDOT(dspace.CapacityBy(config.Mode))
 	return
 }
@@ -186,6 +206,19 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		wkls := make([]string, len(config.Demand), len(config.Demand))
+		for i, d := range config.Demand {
+			wkls[i] = strconv.Itoa(d)
+		}
+
+		if config.Mode == "MaxSLO" {
+			slos := []float32{10000, 20000, 30000, 40000, 50000}
+			if config.App == "terasort" {
+				slos = []float32{0.01, 0.02, 0.03, 0.04, 0.05}
+			}
+			dspace = *dspace.CalcMaxSLO(m, wkls, slos)
+		}
+
 		c := capacitor.Capacitor{dspace, m}
 		var h capacitor.Heuristic
 		switch config.Heuristic {
@@ -197,11 +230,6 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 			h = capacitor.NewShortestPath(&c, config.EquiBehavior)
 		default:
 			h = capacitor.NewPolicy(&c, config.Configuration, config.WKL, config.EquiBehavior, config.IsCapacityFirst)
-		}
-
-		wkls := make([]string, len(config.Demand), len(config.Demand))
-		for i, d := range config.Demand {
-			wkls[i] = strconv.Itoa(d)
 		}
 
 		execInfo, dspaceInfo := h.Exec(config.Mode, config.Slo, wkls)

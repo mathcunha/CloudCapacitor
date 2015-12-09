@@ -5,6 +5,7 @@ import (
 	"log"
 	"reflect"
 	"sort"
+	"strings"
 )
 
 type Node struct {
@@ -27,6 +28,7 @@ type byMem struct{ Configs }
 type byCPU struct{ Configs }
 type byPrice struct{ Configs }
 type byStrict struct{ Configs }
+type byMaxSLO struct{ Configs }
 
 type bySize struct{ Nodes }
 
@@ -40,8 +42,8 @@ func (s byMem) Less(i, j int) bool    { return s.Configs[i].Mem() < s.Configs[j]
 func (s byCPU) Less(i, j int) bool    { return s.Configs[i].CPU() < s.Configs[j].CPU() }
 func (s byPrice) Less(i, j int) bool  { return s.Configs[i].Price() < s.Configs[j].Price() }
 func (s byStrict) Less(i, j int) bool { return s.Configs[i].Strict() < s.Configs[j].Strict() }
-
-func (s bySize) Less(i, j int) bool { return s.Nodes[i].Config.Size < s.Nodes[j].Config.Size }
+func (s bySize) Less(i, j int) bool   { return s.Nodes[i].Config.Size < s.Nodes[j].Config.Size }
+func (s byMaxSLO) Less(i, j int) bool { return s.Configs[j].maxSLO < s.Configs[i].maxSLO }
 
 func NewDeploymentSpace(vms *[]VM, price float32, size int) (dspace DeploymentSpace) {
 	mapa := make(map[string]Configs)
@@ -50,7 +52,7 @@ func NewDeploymentSpace(vms *[]VM, price float32, size int) (dspace DeploymentSp
 	for i := 1; i <= size && atLeatOne; i++ {
 		atLeatOne = false
 		for _, v := range *vms {
-			c := Configuration{i, v}
+			c := Configuration{i, v, ""}
 			if c.Price() <= price {
 				atLeatOne = true
 				conf := mapa[c.Category]
@@ -72,10 +74,19 @@ func (dspace *DeploymentSpace) Categories() []string {
 	return dspace.cats
 }
 
+func (dspace *DeploymentSpace) Configurations() (configs Configs) {
+	configs = make(Configs, 0, 56)
+	for _, c := range *dspace.configs {
+		configs = append(configs, c...)
+	}
+	return
+}
+
 func (dspace *DeploymentSpace) CapacityBy(prop string) (list *map[string]Nodes) {
 	for _, v := range *dspace.configs {
 		switch prop {
-
+		case "MaxSLO":
+			sort.Sort(byMaxSLO{v})
 		case "Mem":
 			sort.Sort(byMem{v})
 		case "CPU":
@@ -90,6 +101,27 @@ func (dspace *DeploymentSpace) CapacityBy(prop string) (list *map[string]Nodes) 
 	}
 
 	return dspace.buildNodes(prop)
+}
+
+func (dspace *DeploymentSpace) CalcMaxSLO(e Executor, wkls []string, slos []float32) *DeploymentSpace {
+	configs := make(Configs, 0, 56)
+	for _, c := range *dspace.configs {
+		configs = append(configs, c...)
+	}
+	for _, wkl := range wkls {
+		for _, c := range configs {
+			result := e.Execute(*c, wkl)
+			maxSLO := 0
+			for i, slo := range slos {
+				maxSLO = i
+				if result.SLO <= slo {
+					break
+				}
+			}
+			c.maxSLO = fmt.Sprintf("%v%v", c.maxSLO, maxSLO)
+		}
+	}
+	return &DeploymentSpace{&map[string]Configs{"c3": dspace.Configurations()}, []string{"c3"}}
 }
 
 func (dspace *DeploymentSpace) buildNodesStrict(prop string) *map[string]Nodes {
@@ -230,6 +262,8 @@ func diffID(x reflect.Value, y reflect.Value) (equal bool) {
 	case reflect.Float32:
 		diff := x.Float() - y.Float()
 		return diff <= 0.001 && diff >= -0.001
+	case reflect.String:
+		return strings.Compare(x.String(), y.String()) == 0
 	}
 
 	return false

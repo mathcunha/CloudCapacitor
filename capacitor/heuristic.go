@@ -662,5 +662,5 @@ func PrintExecPath(winner ExecInfo, wkls []string, nodes Nodes) {
 		}
 	}
 	str = fmt.Sprintf("%vTotal Execs:%v", str, execs)
-	log.Printf(str)
+	//log.Printf(str)
 }

@@ -19,6 +19,7 @@ type VM struct {
 type Configuration struct {
 	Size int
 	VM
+	maxSLO string
 }
 
 func (c *Configuration) Price() float32 {
@@ -37,12 +38,16 @@ func (c *Configuration) Strict() int {
 	return c.VM.Strict
 }
 
+func (c *Configuration) MaxSLO() string {
+	return c.maxSLO
+}
+
 func (vm VM) String() string {
 	return fmt.Sprintf("{category:%v, cpu:%v , mem:%v, price:%v, strict:%v}", vm.Category, vm.CPU, vm.Mem, vm.Price, vm.Strict)
 }
 
 func (c Configuration) String() string {
-	return fmt.Sprintf("{vm:%v, size:%v, cpu:%v, mem:%v, price:%v}", c.VM.Name, c.Size, c.CPU(), c.Mem(), c.Price())
+	return fmt.Sprintf("{vm:%v, size:%v, cpu:%v, mem:%v, price:%v, maxSLO:%v}", c.VM.Name, c.Size, c.CPU(), c.Mem(), c.Price(), c.maxSLO)
 }
 
 func LoadTypes(path string) (vms []VM, err error) {
