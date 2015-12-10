@@ -1,9 +1,5 @@
 package capacitor
 
-import (
-	"fmt"
-)
-
 func DiffDS(configs Configs, src, dest *map[string]Nodes) (convergence, absence, divergence int) {
 	for _, c := range configs {
 		srcNode := getNodeByConf(c, src)
@@ -13,12 +9,11 @@ func DiffDS(configs Configs, src, dest *map[string]Nodes) (convergence, absence,
 		absence += a
 		divergence += d
 	}
-	fmt.Printf("convergence:%d, absence:%d, divergence:%d\n", convergence, absence, divergence)
 	return
 }
 
 func nodeDiff(srcNode, destNode *Node) (convergence, absence, divergence int) {
-	fmt.Printf("\tsrcNode:%s\ndestNode:%s\n\n", srcNode, destNode)
+	//fmt.Printf("\tsrcNode:%s\ndestNode:%s\n\n", srcNode, destNode)
 	c, a, d := nodesArrayDiff(srcNode.Higher, destNode.Higher)
 	convergence += c
 	absence += a
@@ -27,13 +22,12 @@ func nodeDiff(srcNode, destNode *Node) (convergence, absence, divergence int) {
 	convergence += c
 	absence += a
 	divergence += d
+	//fmt.Printf("nodeDiff:\tconvergence:%d, absence:%d, divergence:%d\n", convergence, absence, divergence)
 	return
 }
 
 func nodesArrayDiff(src, dest Nodes) (convergence, absence, divergence int) {
-	if src == nil && dest != nil {
-		convergence++
-	} else {
+	if src != nil || dest != nil {
 		for _, srcNode := range src {
 			found := false
 			for _, destNode := range dest {
@@ -42,6 +36,16 @@ func nodesArrayDiff(src, dest Nodes) (convergence, absence, divergence int) {
 			if found {
 				convergence++
 			} else {
+				absence++
+			}
+		}
+
+		for _, destNode := range dest {
+			found := false
+			for _, srcNode := range src {
+				found = found || confEqual(srcNode.Config, destNode.Config)
+			}
+			if !found {
 				divergence++
 			}
 		}
