@@ -16,7 +16,7 @@ func TestCapacitySLO(t *testing.T) {
 	dspace = *dspace.CalcMaxSLO(e, []string{"100", "200", "300", "400", "500", "600", "700", "800", "900", "1000"}, []float32{10000, 20000, 30000, 40000, 50000})
 	mapa := dspace.CapacityBy("MaxSLO")
 	t.Logf("configs generated %v", dspace)
-	t.Logf("mapa by SLO :%v", NodesToDOT(mapa))
+	t.Logf("mapa by SLO :%v", printTree(mapa))
 }
 func TestCapacityMem(t *testing.T) {
 	vms, err := LoadTypes("/home/vagrant/go/src/github.com/mathcunha/CloudCapacitor/config/dspace.yml")

@@ -94,10 +94,11 @@ func NodesToDOT(r *http.Request) (graph string) {
 		for i, d := range config.Demand {
 			wkls[i] = strconv.Itoa(d)
 		}
-		slos := []float32{10000, 20000, 30000, 40000, 50000}
-		if config.App == "terasort" {
-			slos = []float32{0.01, 0.02, 0.03, 0.04, 0.05}
-		}
+		slos := []float32{config.Slo}
+		//slos := []float32{10000, 20000, 30000, 40000, 50000}
+		//if config.App == "terasort" {
+		//	slos = []float32{0.01, 0.02, 0.03, 0.04, 0.05}
+		//}
 		dspace = *dspace.CalcMaxSLO(m, wkls, slos)
 	}
 	graph = capacitor.NodesToDOT(dspace.CapacityBy(config.Mode))

@@ -112,10 +112,18 @@ func (dspace *DeploymentSpace) CalcMaxSLO(e Executor, wkls []string, slos []floa
 		for _, c := range configs {
 			result := e.Execute(*c, wkl)
 			maxSLO := 0
-			for i, slo := range slos {
-				maxSLO = i
-				if result.SLO <= slo {
-					break
+			if len(slos) == 1 {
+				if result.SLO <= slos[0] {
+					maxSLO = 0
+				} else {
+					maxSLO = 1
+				}
+			} else {
+				for i, slo := range slos {
+					maxSLO = i
+					if result.SLO <= slo {
+						break
+					}
 				}
 			}
 			c.maxSLO = fmt.Sprintf("%v%v", c.maxSLO, maxSLO)
