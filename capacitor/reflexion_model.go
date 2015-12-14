@@ -17,7 +17,7 @@ func isConvergence(node, lNode *Node) bool {
 	return true
 }
 
-func VerifyReflexionModel(configs Configs, mapNodes *map[string]Nodes) (convergence, absence, divergence int) {
+func VerifyReflexionModel(configs Configs, mapNodes *map[string]Nodes, equi bool) (convergence, absence, divergence int) {
 	for _, c := range configs {
 		node, nodes := getNodeByConf(c, mapNodes)
 		for _, lNode := range node.Lower {
@@ -52,7 +52,15 @@ func VerifyReflexionModel(configs Configs, mapNodes *map[string]Nodes) (converge
 			for j := k + 1; j < len(node.Lower); j++ {
 				result := strings.Compare(node.Lower[k].Config.MaxSLO(), node.Lower[j].Config.MaxSLO())
 				if result == 0 {
-					absence += 2
+					if equi {
+						convergence += 2
+					} else {
+						absence += 2
+					}
+				} else {
+					if equi {
+						divergence += 2
+					}
 				}
 			}
 		}
