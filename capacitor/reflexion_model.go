@@ -47,19 +47,31 @@ func VerifyReflexionModel(configs Configs, mapNodes *map[string]Nodes, equi bool
 				}
 			}
 		}
-		//same level possible absence
-		for k := 0; k < len(node.Lower); k++ {
-			for j := k + 1; j < len(node.Lower); j++ {
-				result := strings.Compare(node.Lower[k].Config.MaxSLO(), node.Lower[j].Config.MaxSLO())
-				if result == 0 {
-					if equi {
-						convergence += 2
-					} else {
-						absence += 2
-					}
-				} else {
-					if equi {
-						divergence += 2
+	}
+	//same level possible absence
+	for _, nodes := range *mapNodes {
+		isLevelVerified := make([]bool, len(configs), len(configs))
+		for _, n := range nodes {
+			if !isLevelVerified[n.Level] {
+				isLevelVerified[n.Level] = true
+				levelNodes := nodes.FromLevel(n)
+				for k := 0; k < len(levelNodes); k++ {
+					for j := k + 1; j < len(levelNodes); j++ {
+						result := strings.Compare(levelNodes[k].Config.MaxSLO(), levelNodes[j].Config.MaxSLO())
+						if result == 0 {
+							if equi {
+								convergence += 2
+							} else {
+								absence += 2
+							}
+						} else {
+							if equi {
+								divergence++
+								convergence++
+							} else {
+								absence++
+							}
+						}
 					}
 				}
 			}
