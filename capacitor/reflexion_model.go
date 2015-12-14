@@ -4,33 +4,55 @@ import (
 	"strings"
 )
 
+func isConvergence(node, lNode *Node) bool {
+	//fmt.Printf("[VerifyReflexionModel] %s -> %s\n", node.Config, lNode.Config)
+	for i := 0; i < len(node.Config.MaxSLO()); i++ {
+		result := strings.Compare(node.Config.MaxSLO()[i:i+1], lNode.Config.MaxSLO()[i:i+1])
+		//fmt.Printf("[VerifyReflexionModel] MaxSLOID h:%s l:%s compare:%d\n", node.Config.MaxSLO()[i:i+1], lNode.Config.MaxSLO()[i:i+1], result)
+		switch result {
+		case -1:
+			return false
+		}
+	}
+	return true
+}
+
 func VerifyReflexionModel(configs Configs, mapNodes *map[string]Nodes) (convergence, absence, divergence int) {
 	for _, c := range configs {
-		node := getNodeByConf(c, mapNodes)
+		node, nodes := getNodeByConf(c, mapNodes)
 		for _, lNode := range node.Lower {
 			//maxslo by workload
-			//fmt.Printf("[VerifyReflexionModel] %s -> %s\n", node.Config, lNode.Config)
-			for i := 0; i < len(node.Config.MaxSLO()); i++ {
-				result := strings.Compare(node.Config.MaxSLO()[i:i+1], lNode.Config.MaxSLO()[i:i+1])
-				//fmt.Printf("[VerifyReflexionModel] MaxSLOID h:%s l:%s compare:%d\n", node.Config.MaxSLO()[i:i+1], lNode.Config.MaxSLO()[i:i+1], result)
-				switch result {
-				case 1:
-					convergence += 2
-				case 0:
-					convergence += 2
-				case -1:
-					divergence += 2
+			if isConvergence(node, lNode) {
+				convergence++
+			} else {
+				divergence++
+			}
+
+		}
+		//nodes right after the current node level, but not at the Lower array
+		if node.Lower != nil && len(node.Lower) > 0 {
+			levelNodes := nodes.FromLevel(node.Lower[0])
+			for _, levelNode := range levelNodes {
+				lower := false
+				for _, lNode := range node.Lower {
+					if confEqual(levelNode.Config, lNode.Config) {
+						lower = true
+						break
+					}
+				}
+				if !lower {
+					if isConvergence(node, levelNode) {
+						absence++
+					}
 				}
 			}
 		}
 		//same level possible absence
 		for k := 0; k < len(node.Lower); k++ {
 			for j := k + 1; j < len(node.Lower); j++ {
-				for i := 0; i < len(node.Config.MaxSLO()); i++ {
-					result := strings.Compare(node.Lower[k].Config.MaxSLO()[i:i+1], node.Lower[j].Config.MaxSLO()[i:i+1])
-					if result == 0 {
-						absence += 2
-					}
+				result := strings.Compare(node.Lower[k].Config.MaxSLO(), node.Lower[j].Config.MaxSLO())
+				if result == 0 {
+					absence += 2
 				}
 			}
 		}
@@ -41,8 +63,8 @@ func VerifyReflexionModel(configs Configs, mapNodes *map[string]Nodes) (converge
 
 func DiffDS(configs Configs, src, dest *map[string]Nodes) (convergence, absence, divergence int) {
 	for _, c := range configs {
-		srcNode := getNodeByConf(c, src)
-		destNode := getNodeByConf(c, dest)
+		srcNode, _ := getNodeByConf(c, src)
+		destNode, _ := getNodeByConf(c, dest)
 		c, a, d := nodeDiff(srcNode, destNode)
 		convergence += c
 		absence += a
@@ -92,9 +114,9 @@ func nodesArrayDiff(src, dest Nodes) (convergence, absence, divergence int) {
 	return
 }
 
-func getNodeByConf(conf *Configuration, ds *map[string]Nodes) (node *Node) {
+func getNodeByConf(conf *Configuration, ds *map[string]Nodes) (node *Node, nodes Nodes) {
 	node = nil
-	for _, nodes := range *ds {
+	for _, nodes = range *ds {
 		for _, n := range nodes {
 			if confEqual(conf, n.Config) {
 				node = n
