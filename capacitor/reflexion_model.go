@@ -1,6 +1,7 @@
 package capacitor
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -17,6 +18,14 @@ func isConvergence(node, lNode *Node) bool {
 	return true
 }
 
+func printAbscence(a, b *Node, both bool) {
+	vertex := "->"
+	if both {
+		vertex = "<->"
+	}
+	fmt.Printf("%s(%d)\t%s\t%s(%d)\n", a.Config.Name, a.Config.Size, vertex, b.Config.Name, b.Config.Size)
+}
+
 func VerifyReflexionModel(configs Configs, mapNodes *map[string]Nodes, equi bool) (convergence, absence, divergence int) {
 	for _, c := range configs {
 		node, nodes := getNodeByConf(c, mapNodes)
@@ -29,7 +38,6 @@ func VerifyReflexionModel(configs Configs, mapNodes *map[string]Nodes, equi bool
 			}
 
 		}
-		//nodes right after the current node level, but not at the Lower array
 		if node.Lower != nil && len(node.Lower) > 0 {
 			levelNodes := nodes.FromLevel(node.Lower[0])
 			for _, levelNode := range levelNodes {
@@ -40,7 +48,9 @@ func VerifyReflexionModel(configs Configs, mapNodes *map[string]Nodes, equi bool
 						break
 					}
 				}
-				if !lower {
+				if strings.Compare(node.Config.MaxSLO(), levelNode.Config.MaxSLO()) == 0 {
+					absence++
+				} else if !lower {
 					if isConvergence(node, levelNode) {
 						absence++
 					}
