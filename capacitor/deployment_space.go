@@ -194,10 +194,10 @@ func (nodes *Nodes) Equivalents(n *Node) Nodes {
 	return equivalents
 }
 
-func (nodes *Nodes) FromLevel(n *Node) Nodes {
+func (nodes *Nodes) FromLevel(level int) Nodes {
 	var equivalents Nodes
 	for _, e := range *nodes {
-		if n.Level == e.Level {
+		if level == e.Level {
 			equivalents = append(equivalents, e)
 		}
 	}

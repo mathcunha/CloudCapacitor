@@ -335,7 +335,7 @@ func (p *Policy) NextConfig(nodesInfo *NodesInfo, nodes Nodes, level int, wkl in
 
 	if nodeInfo != nil {
 		//it is ordered
-		equivalent := nodes.FromLevel((&nodeInfo.Node))
+		equivalent := nodes.FromLevel((nodeInfo.Node.Level))
 		if len(equivalent) > 0 {
 			node := equivalent[len(equivalent)/2]
 			if node.Config.Size < nodeInfo.Config.Size {

@@ -5,6 +5,27 @@ import (
 	"strings"
 )
 
+const (
+	Bigger = iota
+	Smaller
+	Equal
+	Empty
+)
+
+func NameRelation(rel int) string {
+	switch rel {
+	case Bigger:
+		return "<--"
+	case Smaller:
+		return "-->"
+	case Equal:
+		return "<->"
+	case Empty:
+		return " O "
+	}
+	return ""
+}
+
 func isConvergence(node, lNode *Node) bool {
 	//fmt.Printf("[VerifyReflexionModel] %s -> %s\n", node.Config, lNode.Config)
 	for i := 0; i < len(node.Config.MaxSLO()); i++ {
@@ -26,9 +47,131 @@ func printAbscence(a, b *Node, both bool) {
 	fmt.Printf("%s(%d)\t%s\t%s(%d)\n", a.Config.Name, a.Config.Size, vertex, b.Config.Name, b.Config.Size)
 }
 
+func WhatRelation(n1, n2 *Node, key1, key2 string, ds *map[string]Nodes, equi bool) (relation int) {
+	relation = Empty
+	if key1 == key2 {
+		nodes := (*ds)[key1]
+		if n1.Level < n2.Level {
+			levelNodes := n1.Lower
+			if equi {
+				levelNodes = nodes.FromLevel(n1.Level + 1)
+			}
+			if hasPathUntilNode(n2, levelNodes, &nodes, equi) {
+				return Smaller
+			} else {
+				return Empty
+			}
+		} else if n1.Level > n2.Level {
+			levelNodes := n2.Lower
+			if equi {
+				levelNodes = nodes.FromLevel(n2.Level + 1)
+			}
+			if hasPathUntilNode(n1, levelNodes, &nodes, equi) {
+				return Bigger
+			} else {
+				return Empty
+			}
+		} else {
+			if equi {
+				return Equal
+			} else {
+				return Empty
+			}
+		}
+
+	}
+	return
+}
+
+func hasPathUntilNode(target *Node, levelNodes Nodes, nodes *Nodes, equi bool) (has bool) {
+	if levelNodes == nil || len(levelNodes) == 0 {
+		has = false
+		return
+	}
+	if target.Level == levelNodes[0].Level {
+		for _, node := range levelNodes {
+			if confEqual(node.Config, target.Config) {
+				has = true
+				return
+			}
+		}
+		has = false
+		return
+	}
+	if equi {
+		has = hasPathUntilNode(target, nodes.FromLevel(levelNodes[0].Level+1), nodes, equi)
+		return
+	}
+	for _, node := range levelNodes {
+		has = hasPathUntilNode(target, node.Lower, nodes, equi)
+		if has {
+			break
+		}
+	}
+	return
+}
+
+func VerifyReflexionModel2(c Configs, mapNodes *map[string]Nodes, equi bool) (convergence, absence, divergence int) {
+	for k := 0; k < len(c); k++ {
+		for j := k + 1; j < len(c); j++ {
+			n1, key1 := getNodeByConf(c[k], mapNodes)
+			n2, key2 := getNodeByConf(c[j], mapNodes)
+			dsRelation := WhatRelation(n1, n2, key1, key2, mapNodes, equi)
+			realRelation := Bigger
+			if strings.Compare(n1.Config.MaxSLO(), n2.Config.MaxSLO()) == 0 {
+				realRelation = Equal
+			} else if isConvergence(n1, n2) {
+				realRelation = Smaller
+			}
+			if dsRelation == Empty {
+				switch realRelation {
+				case Smaller:
+					absence++
+				case Equal:
+					absence += 2
+				}
+			} else if dsRelation == Smaller {
+				switch realRelation {
+				case Smaller:
+					convergence++
+				case Bigger:
+					divergence++
+				case Equal:
+					convergence++
+					absence++
+				}
+			} else if dsRelation == Bigger {
+				switch realRelation {
+				case Bigger:
+					convergence++
+				case Smaller:
+					divergence++
+				case Equal:
+					convergence++
+					absence++
+				}
+			} else if dsRelation == Equal {
+				switch realRelation {
+				case Bigger:
+					convergence++
+					divergence++
+				case Smaller:
+					convergence++
+					divergence++
+				case Equal:
+					convergence += 2
+				}
+			}
+			fmt.Printf("%s(%d)\t%s\t%s(%d)\tReal:%s\t(c:%d,a:%d,d:%d)\n", n1.Config.Name, n1.Config.Size, NameRelation(dsRelation), n2.Config.Name, n2.Config.Size, NameRelation(realRelation), convergence, absence, divergence)
+		}
+	}
+	return
+}
+
 func VerifyReflexionModel(configs Configs, mapNodes *map[string]Nodes, equi bool) (convergence, absence, divergence int) {
 	for _, c := range configs {
-		node, nodes := getNodeByConf(c, mapNodes)
+		node, key := getNodeByConf(c, mapNodes)
+		nodes := (*mapNodes)[key]
 		for _, lNode := range node.Lower {
 			//maxslo by workload
 			if isConvergence(node, lNode) {
@@ -39,7 +182,7 @@ func VerifyReflexionModel(configs Configs, mapNodes *map[string]Nodes, equi bool
 
 		}
 		if node.Lower != nil && len(node.Lower) > 0 {
-			levelNodes := nodes.FromLevel(node.Lower[0])
+			levelNodes := nodes.FromLevel(node.Lower[0].Level)
 			for _, levelNode := range levelNodes {
 				lower := false
 				for _, lNode := range node.Lower {
@@ -68,7 +211,7 @@ func VerifyReflexionModel(configs Configs, mapNodes *map[string]Nodes, equi bool
 		for _, n := range nodes {
 			if !isLevelVerified[n.Level] {
 				isLevelVerified[n.Level] = true
-				levelNodes := nodes.FromLevel(n)
+				levelNodes := nodes.FromLevel(n.Level)
 				for k := 0; k < len(levelNodes); k++ {
 					for j := k + 1; j < len(levelNodes); j++ {
 						result := strings.Compare(levelNodes[k].Config.MaxSLO(), levelNodes[j].Config.MaxSLO())
@@ -148,13 +291,12 @@ func nodesArrayDiff(src, dest Nodes) (convergence, absence, divergence int) {
 	return
 }
 
-func getNodeByConf(conf *Configuration, ds *map[string]Nodes) (node *Node, nodes Nodes) {
+func getNodeByConf(conf *Configuration, ds *map[string]Nodes) (node *Node, key string) {
 	node = nil
-	for _, nodes = range *ds {
+	for key, nodes := range *ds {
 		for _, n := range nodes {
 			if confEqual(conf, n.Config) {
-				node = n
-				return
+				return n, key
 			}
 		}
 	}
