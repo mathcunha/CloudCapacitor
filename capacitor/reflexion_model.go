@@ -49,7 +49,11 @@ func VerifyReflexionModel(configs Configs, mapNodes *map[string]Nodes, equi bool
 					}
 				}
 				if strings.Compare(node.Config.MaxSLO(), levelNode.Config.MaxSLO()) == 0 {
-					absence++
+					if !lower {
+						absence += 2
+					} else {
+						absence++
+					}
 				} else if !lower {
 					if isConvergence(node, levelNode) {
 						absence++
