@@ -129,6 +129,8 @@ func VerifyReflexionModel2(c Configs, mapNodes *map[string]Nodes, equi bool) (co
 					absence++
 				case Equal:
 					absence += 2
+				case Bigger:
+					absence++
 				}
 			} else if dsRelation == Smaller {
 				switch realRelation {
@@ -162,7 +164,7 @@ func VerifyReflexionModel2(c Configs, mapNodes *map[string]Nodes, equi bool) (co
 					convergence += 2
 				}
 			}
-			fmt.Printf("%s(%d)\t%s\t%s(%d)\tReal:%s\t(c:%d,a:%d,d:%d)\n", n1.Config.Name, n1.Config.Size, NameRelation(dsRelation), n2.Config.Name, n2.Config.Size, NameRelation(realRelation), convergence, absence, divergence)
+			//fmt.Printf("%s(%d)\t%s\t%s(%d)\tReal:%s\t(c:%d,a:%d,d:%d)\n", n1.Config.Name, n1.Config.Size, NameRelation(dsRelation), n2.Config.Name, n2.Config.Size, NameRelation(realRelation), convergence, absence, divergence)
 		}
 	}
 	return
