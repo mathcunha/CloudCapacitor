@@ -138,6 +138,7 @@ func VerifyReflexionModel2(c Configs, mapNodes *map[string]Nodes, equi bool) (co
 					convergence++
 				case Bigger:
 					divergence++
+					absence++
 				case Equal:
 					convergence++
 					absence++
@@ -148,6 +149,7 @@ func VerifyReflexionModel2(c Configs, mapNodes *map[string]Nodes, equi bool) (co
 					convergence++
 				case Smaller:
 					divergence++
+					absence++
 				case Equal:
 					convergence++
 					absence++
