@@ -335,9 +335,9 @@ func (p *Policy) NextConfig(nodesInfo *NodesInfo, nodes Nodes, level int, wkl in
 
 	if nodeInfo != nil {
 		//it is ordered
-		equivalent := nodes.FromLevel((nodeInfo.Node.Level))
+		equivalent := nodes.Equivalents((&nodeInfo.Node))
 		if len(equivalent) > 0 {
-			node := equivalent[len(equivalent)/2]
+			node := equivalent[0]
 			if node.Config.Size < nodeInfo.Config.Size {
 				key = GetMatrixKey(node.ID, wkl)
 				nodeInfo = nodesInfo.Matrix[key]
