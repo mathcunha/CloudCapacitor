@@ -248,7 +248,9 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 		for k, e := range bestPrice {
 			if e.Config != nil {
 				//fmt.Printf("%s - %.4f/%.4f\n", k, e.Config.Price(), bestPriceFound[k])
-				success += e.Config.Price() / bestPriceFound[k]
+				if bestPriceFound[k] != 0 {
+					success += e.Config.Price() / bestPriceFound[k]
+				}
 			} else if e.right {
 				success += 1
 			}
