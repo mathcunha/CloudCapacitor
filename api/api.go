@@ -235,22 +235,26 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 
 		execInfo, dspaceInfo := h.Exec(config.Mode, config.Slo, wkls)
 		bestPrice := make(map[string]ExecInfo)
+		bestPriceFound := make(map[string]float32)
 
 		str := ExecPathSummary(execInfo, wkls, config.Mode, &c)
-		if strDeployment := DeploymentSpace(config.Mode, &c, dspaceInfo, m, config.Slo, &bestPrice); len(strDeployment) > 1 {
+		if strDeployment := DeploymentSpace(config.Mode, &c, dspaceInfo, m, config.Slo, &bestPrice, &bestPriceFound); len(strDeployment) > 1 {
 			str = fmt.Sprintf("%v, \"spaceInfo\":%v}", str[0:len(str)-1], strDeployment)
 		} else {
 			str = fmt.Sprintf("%v, \"spaceInfo\":[]}", str[0:len(str)-1])
 		}
 
-		success := 0
-		for _, e := range bestPrice {
-			if e.right {
+		success := float32(0)
+		for k, e := range bestPrice {
+			if e.Config != nil {
+				//fmt.Printf("%s - %.4f/%.4f\n", k, e.Config.Price(), bestPriceFound[k])
+				success += e.Config.Price() / bestPriceFound[k]
+			} else if e.right {
 				success += 1
 			}
 		}
 
-		str = fmt.Sprintf("%v,%v, \"success\":%v}", str[0:len(str)-1], ExecsByKey(execInfo, &c, dspaceInfo, wkls), float32(success)/float32(len(config.Demand)))
+		str = fmt.Sprintf("%v,%v, \"success\":%.4f}", str[0:len(str)-1], ExecsByKey(execInfo, &c, dspaceInfo, wkls), float32(success)/float32(len(config.Demand)))
 
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprintf(w, "%v", str)
@@ -298,7 +302,7 @@ func CalcFmeasure(tp int, fp int, fn int) (fmeasure float64) {
 	return
 }
 
-func DeploymentSpace(mode string, c *capacitor.Capacitor, dspaceInfo map[string]capacitor.NodesInfo, executor capacitor.Executor, slo float32, bestPrice *map[string]ExecInfo) (str string) {
+func DeploymentSpace(mode string, c *capacitor.Capacitor, dspaceInfo map[string]capacitor.NodesInfo, executor capacitor.Executor, slo float32, bestPrice *map[string]ExecInfo, bestPriceFound *map[string]float32) (str string) {
 	nodeMap := *c.Dspace.CapacityBy(mode)
 
 	str = "["
@@ -308,11 +312,11 @@ func DeploymentSpace(mode string, c *capacitor.Capacitor, dspaceInfo map[string]
 		for level := 1; level <= nodesInfo.Levels; level++ {
 			node := nodes.NodeByLevel(level)
 			for wkl := 0; wkl < nodesInfo.Workloads; wkl++ {
-				str = fmt.Sprintf("%v%v", str, PrintNodeExecInfo(node, wkl, nodesInfo, executor, slo, bestPrice))
+				str = fmt.Sprintf("%v%v", str, PrintNodeExecInfo(node, wkl, nodesInfo, executor, slo, bestPrice, bestPriceFound))
 			}
 			for _, e := range nodes.Equivalents(node) {
 				for wkl := 0; wkl < nodesInfo.Workloads; wkl++ {
-					str = fmt.Sprintf("%v%v", str, PrintNodeExecInfo(e, wkl, nodesInfo, executor, slo, bestPrice))
+					str = fmt.Sprintf("%v%v", str, PrintNodeExecInfo(e, wkl, nodesInfo, executor, slo, bestPrice, bestPriceFound))
 				}
 			}
 		}
@@ -323,7 +327,7 @@ func DeploymentSpace(mode string, c *capacitor.Capacitor, dspaceInfo map[string]
 	return
 }
 
-func PrintNodeExecInfo(node *capacitor.Node, wkl int, nodesInfo capacitor.NodesInfo, executor capacitor.Executor, slo float32, bestPrice *map[string]ExecInfo) (str string) {
+func PrintNodeExecInfo(node *capacitor.Node, wkl int, nodesInfo capacitor.NodesInfo, executor capacitor.Executor, slo float32, bestPrice *map[string]ExecInfo, bestPriceFound *map[string]float32) (str string) {
 	key := capacitor.GetMatrixKey(node.ID, wkl)
 	nodeInfo := nodesInfo.Matrix[key]
 	if wkl == 0 {
@@ -345,6 +349,16 @@ func PrintNodeExecInfo(node *capacitor.Node, wkl int, nodesInfo capacitor.NodesI
 		_, has := (*bestPrice)[nodeInfo.WKL]
 		if !has {
 			(*bestPrice)[nodeInfo.WKL] = ExecInfo{nil, right}
+		}
+	}
+	if nodeInfo.Candidate {
+		e, has := (*bestPriceFound)[nodeInfo.WKL]
+		if has {
+			if e > (*node).Config.Price() {
+				(*bestPriceFound)[nodeInfo.WKL] = (*node).Config.Price()
+			}
+		} else {
+			(*bestPriceFound)[nodeInfo.WKL] = (*node).Config.Price()
 		}
 	}
 	str = fmt.Sprintf("%v{\"wkl\":\"%v\", \"when\":%v, \"exec\":%v, \"cadidate\":%v, \"right\":%v},", str, nodeInfo.WKL, nodeInfo.When, nodeInfo.Exec, nodeInfo.Candidate, right)
