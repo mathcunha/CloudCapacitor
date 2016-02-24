@@ -58,18 +58,36 @@ func init() {
 }
 
 func Predict(capPoints []CapacitorPoint, capPoint CapacitorPoint, slo float64) (performance float64) {
-	if points := pointsByWorkload(capPoints, capPoint); len(points) > 0 {
-		uslByWorkload := USL{Points: points, Y1IsMax: true}
-		uslByWorkload.BuildUSL()
-		performance = uslByWorkload.Predict(float64(capPoint.config.CPU()))
-		fmt.Printf("uslByWorkload prediction of %v is %f", capPoint, performance)
+	performance = -1
+	if points := pointsByThroughput(capPoints, capPoint); len(points) > 1 {
+		usl := USL{Points: points}
+		usl.BuildUSL()
+		if usl.R2 >= 0.7 {
+			performance = float64(capPoint.wkl) / usl.Predict(float64(capPoint.config.CPU()))
+			fmt.Printf("uslByThroughput prediction of %v is %f\n", capPoint, performance)
+		}
+	}
+	if points := pointsByWorkload(capPoints, capPoint); len(points) > 1 {
+		usl := USL{Points: points, Y1IsMax: true}
+		usl.BuildUSL()
+		if usl.R2 >= 0.7 {
+			performance = usl.Predict(float64(capPoint.config.CPU()))
+			fmt.Printf("uslByWorkload prediction of %v is %f\n", capPoint, performance)
+		}
 	}
 
-	if points := pointsByConfiguration(capPoints, capPoint); len(points) > 0 {
-		uslByConfiguration := USL{Points: pointsByConfiguration(capPoints, capPoint), Y1IsMax: false}
-		uslByConfiguration.BuildUSL()
-		performance = uslByConfiguration.Predict(float64(capPoint.wkl))
-		fmt.Printf("uslByConfiguration prediction of %v is %f", capPoint, performance)
+	if points := pointsByConfiguration(capPoints, capPoint); len(points) > 1 {
+		usl := USL{Points: points}
+		usl.BuildUSL()
+		performance = usl.Predict(float64(capPoint.wkl))
+		fmt.Printf("uslByConfiguration prediction of %v is %f\n", capPoint, performance)
+	}
+	return
+}
+
+func pointsByThroughput(capPoints []CapacitorPoint, capPoint CapacitorPoint) (points Points) {
+	for _, v := range capPoints {
+		points = append(points, Point{float64(v.config.CPU()), float64(v.wkl) / v.performance})
 	}
 	return
 }
@@ -80,7 +98,6 @@ func pointsByConfiguration(capPoints []CapacitorPoint, capPoint CapacitorPoint) 
 			points = append(points, Point{float64(v.wkl), v.performance})
 		}
 	}
-	fmt.Printf("original capPoints has %d elements and wokload filtered by %d has %d \n", len(capPoints), capPoint.wkl, len(points))
 	return
 }
 
@@ -90,7 +107,6 @@ func pointsByWorkload(capPoints []CapacitorPoint, capPoint CapacitorPoint) (poin
 			points = append(points, Point{float64(v.config.CPU()), float64(v.performance)})
 		}
 	}
-	fmt.Printf("original capPoints has %d elements and wokload filtered by %d has %d \n", len(capPoints), capPoint.wkl, len(points))
 	return
 }
 
@@ -159,7 +175,7 @@ func (u *USL) BuildUSL() {
 }
 
 func CallAzureMLService(body, auth, endpoint string) (out string, err error) {
-	fmt.Printf("calling AzureMLService, endpoint:%s, auth:%s, body:%s\n", endpoint, auth, body)
+	//fmt.Printf("calling AzureMLService, endpoint:%s, auth:%s, body:%s\n", endpoint, auth, body)
 	req, err := http.NewRequest("POST", endpoint, bytes.NewBufferString(body))
 	if err != nil {
 		return "", err
