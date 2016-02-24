@@ -57,7 +57,7 @@ func init() {
 	azureAuth = config.Auth
 }
 
-func Predict(capPoints []CapacitorPoint, capPoint CapacitorPoint, slo float64) (performance float64) {
+func Predict(capPoints []CapacitorPoint, capPoint CapacitorPoint) (performance float64) {
 	performance = -1
 	if points := pointsByThroughput(capPoints, capPoint); len(points) > 1 {
 		usl := USL{Points: points}
