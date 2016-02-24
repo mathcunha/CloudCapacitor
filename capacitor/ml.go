@@ -7,6 +7,8 @@ import (
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
+	"net/http"
+	"time"
 )
 
 var azureEndPoint string
@@ -26,8 +28,8 @@ type Point struct {
 type Points []Point
 
 type USL struct {
-	Points               Points
-	Alpha, Beta, R2, Max float64
+	Points                 Points
+	Alpha, Beta, R2, N, Y1 float64
 }
 
 func init() {
@@ -52,12 +54,14 @@ func init() {
 	}
 	azureEndPoint = config.Endpoint
 	azureAuth = config.Auth
-	fmt.Printf("%v\n", config)
 }
 
 func Predict(capPoints []CapacitorPoint, capPoint CapacitorPoint, slo float64) (performance float64) {
 	uslByWorkload := USL{Points: pointsByWorkload(capPoints, capPoint)}
 	uslByWorkload.BuildUSL()
+	fmt.Println(uslByWorkload)
+	performance = uslByWorkload.Predict(float64(capPoint.config.CPU()))
+	fmt.Printf("prediction of %v is %f", capPoint, performance)
 	return
 }
 
@@ -72,7 +76,16 @@ func pointsByWorkload(capPoints []CapacitorPoint, capPoint CapacitorPoint) (poin
 	return
 }
 
+func (u *USL) Predict(x float64) (y float64) {
+	kappa := u.Beta
+	sigma := u.Alpha + kappa
+	y = x / (1 + (sigma * (x - 1)) + (kappa * x * (x - 1)))
+	y *= u.Y1
+	return
+}
+
 func (u *USL) BuildUSL() {
+	u.R2 = -1
 	smaller := u.Points[0]
 	for _, v := range u.Points {
 		if v.X < smaller.X {
@@ -87,12 +100,58 @@ func (u *USL) BuildUSL() {
 	}
 
 	points = append(points, u.Points...)
-
-	fmt.Printf("USL model has %d points, but model has %d\n", len(u.Points), len(points))
+	u.Y1 = points[0].Y
 
 	buf := bytes.NewBufferString("")
 	json.NewEncoder(buf).Encode(points)
 
 	body := fmt.Sprintf("{\"Inputs\": {\"input1\": {\"ColumnNames\": [\"points\"], \"Values\": [[%q]]}}, \"GlobalParameters\": {}}", buf.String())
-	fmt.Println(body)
+	out, err := CallAzureMLService(body, azureAuth, azureEndPoint)
+	if err != nil {
+		log.Printf("BuildUSL error calling AzureMLService: %v\n", err)
+	} else {
+		values := struct {
+			Results struct {
+				Output1 struct {
+					//Value map[string][][]string
+					Value struct {
+						Values [][]string
+					}
+				} `json:"output1"`
+			}
+		}{}
+
+		err = json.Unmarshal([]byte(out), &values)
+		if err != nil {
+			log.Printf("BuildUSL error parsing response %v: %v\n", out, err)
+		} else {
+			usl := values.Results.Output1.Value.Values[0][0]
+			usl = usl[1 : len(usl)-1]
+			err = json.Unmarshal([]byte(usl), u)
+			if err != nil {
+				log.Printf("BuildUSL error parsing response %v: %v\n", usl, err)
+			}
+		}
+	}
+}
+
+func CallAzureMLService(body, auth, endpoint string) (out string, err error) {
+	fmt.Printf("calling AzureMLService, endpoint:%s, auth:%s, body:%s\n", endpoint, auth, body)
+	req, err := http.NewRequest("POST", endpoint, bytes.NewBufferString(body))
+	if err != nil {
+		return "", err
+	}
+	cli := &http.Client{Timeout: 2 * time.Minute}
+	req.Header.Add("Authorization", auth)
+	req.Header.Add("Content-Type", "application/json")
+	res, err := cli.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer res.Body.Close()
+	resBody, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(resBody), nil
 }
