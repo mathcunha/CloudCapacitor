@@ -30,6 +30,7 @@ type Points []Point
 type USL struct {
 	Points                 Points
 	Alpha, Beta, R2, N, Y1 float64
+	Y1IsMax                bool
 }
 
 func init() {
@@ -57,18 +58,35 @@ func init() {
 }
 
 func Predict(capPoints []CapacitorPoint, capPoint CapacitorPoint, slo float64) (performance float64) {
-	uslByWorkload := USL{Points: pointsByWorkload(capPoints, capPoint)}
-	uslByWorkload.BuildUSL()
-	fmt.Println(uslByWorkload)
-	performance = uslByWorkload.Predict(float64(capPoint.config.CPU()))
-	fmt.Printf("prediction of %v is %f", capPoint, performance)
+	if points := pointsByWorkload(capPoints, capPoint); len(points) > 0 {
+		uslByWorkload := USL{Points: points, Y1IsMax: true}
+		uslByWorkload.BuildUSL()
+		performance = uslByWorkload.Predict(float64(capPoint.config.CPU()))
+		fmt.Printf("uslByWorkload prediction of %v is %f", capPoint, performance)
+	}
+
+	if points := pointsByConfiguration(capPoints, capPoint); len(points) > 0 {
+		uslByConfiguration := USL{Points: pointsByConfiguration(capPoints, capPoint), Y1IsMax: false}
+		uslByConfiguration.BuildUSL()
+		performance = uslByConfiguration.Predict(float64(capPoint.wkl))
+		fmt.Printf("uslByConfiguration prediction of %v is %f", capPoint, performance)
+	}
+	return
+}
+
+func pointsByConfiguration(capPoints []CapacitorPoint, capPoint CapacitorPoint) (points Points) {
+	for _, v := range capPoints {
+		if v.config.Size == capPoint.config.Size && v.config.VM.Name == capPoint.config.VM.Name {
+			points = append(points, Point{float64(v.wkl), v.performance})
+		}
+	}
+	fmt.Printf("original capPoints has %d elements and wokload filtered by %d has %d \n", len(capPoints), capPoint.wkl, len(points))
 	return
 }
 
 func pointsByWorkload(capPoints []CapacitorPoint, capPoint CapacitorPoint) (points Points) {
 	for _, v := range capPoints {
 		if v.wkl == capPoint.wkl {
-			fmt.Printf("# of vCPUS %f for config %v\n", v.config.CPU(), v.config)
 			points = append(points, Point{float64(v.config.CPU()), float64(v.performance)})
 		}
 	}
@@ -95,7 +113,12 @@ func (u *USL) BuildUSL() {
 
 	points := Points{}
 	if smaller.X != 1 {
-		smaller.X, smaller.Y = 1, smaller.Y/smaller.X
+		factor := 1.0 / smaller.X
+		if u.Y1IsMax {
+			smaller.X, smaller.Y = 1, smaller.Y*(1+factor)
+		} else {
+			smaller.X, smaller.Y = 1, smaller.Y*factor
+		}
 		points = append(points, smaller)
 	}
 
