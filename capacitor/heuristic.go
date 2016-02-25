@@ -140,33 +140,40 @@ func (h *BrutalForce) Exec(mode string, slo float32, wkls []string) (path ExecIn
 	return execInfo, dspaceInfo
 }
 
-func (h *Policy) PredictNextNode(capPoints []CapacitorPoint, nodesInfo NodesInfo, slo float32, nodes Nodes) (key string, nodeInfo NodeInfo) {
-	fmt.Println("INI PredictNextNode")
+//how many nodes should left if key was executed
+func whatIfNodesLeft(nodesInfo *NodesInfo, passed bool, key string, h *Policy, nodes Nodes, node *NodeInfo) int {
+	localNodesInfo := nodesInfo.Clone()
+	localNodesInfo.Mark(key, passed, 1, true)
+	//Equivalents Actions
+	if h.equiBehavior == Mark {
+		equivalent := nodes.Equivalents(&node.Node)
+		_, wkl := SplitMatrixKey(key)
+		for _, lNode := range equivalent {
+			lKey := GetMatrixKey(lNode.ID, wkl)
+			lNodeInfo := nodesInfo.Matrix[lKey]
+			if !(lNodeInfo.When != -1) {
+				localNodesInfo.Mark(lKey, passed, 1, false)
+			}
+		}
+	}
+	return h.c.NodesLeft(localNodesInfo)
+}
+
+func (h *Policy) PredictNextNode(capPoints []CapacitorPoint, nodesInfo NodesInfo, nextKey string, slo float64, nodes Nodes) (key string, nodeInfo *NodeInfo) {
+	//select by the Policy
+	worstCase := whatIfNodesLeft(nodesInfo.Clone(), false, nextKey, h, nodes, nodesInfo.Matrix[nextKey])
+	if nodesLeft := whatIfNodesLeft(nodesInfo.Clone(), true, nextKey, h, nodes, nodesInfo.Matrix[nextKey]); nodesLeft > worstCase {
+		worstCase = nodesLeft
+	}
+
 	var predictPoints []predictPoint
+
 	//calc mark potential
 	for key, node := range nodesInfo.Matrix {
 		if !(node.When != -1) {
-			candidateNodesInfo := nodesInfo.Clone()
-			rejectNodesInfo := nodesInfo.Clone()
-			calcNodesLeft := func(localNodesInfo *NodesInfo, passed bool) int {
-				localNodesInfo.Mark(key, passed, 1, true)
-				//Equivalents Actions
-				if h.equiBehavior == Mark {
-					equivalent := nodes.Equivalents(&node.Node)
-					_, wkl := SplitMatrixKey(key)
-					for _, lNode := range equivalent {
-						lKey := GetMatrixKey(lNode.ID, wkl)
-						lNodeInfo := nodesInfo.Matrix[lKey]
-						if !(lNodeInfo.When != -1) {
-							localNodesInfo.Mark(lKey, passed, 1, false)
-						}
-					}
-				}
-				return h.c.NodesLeft(localNodesInfo)
-			}
 			wkl, _ := strconv.Atoi(node.WKL)
-			predictPoints = append(predictPoints, predictPoint{CapacitorPoint{config: *node.Config, wkl: wkl}, key, calcNodesLeft(rejectNodesInfo, false), false})
-			predictPoints = append(predictPoints, predictPoint{CapacitorPoint{config: *node.Config, wkl: wkl}, key, calcNodesLeft(candidateNodesInfo, true), true})
+			predictPoints = append(predictPoints, predictPoint{CapacitorPoint{config: *node.Config, wkl: wkl}, key, whatIfNodesLeft(nodesInfo.Clone(), false, key, h, nodes, node), false})
+			predictPoints = append(predictPoints, predictPoint{CapacitorPoint{config: *node.Config, wkl: wkl}, key, whatIfNodesLeft(nodesInfo.Clone(), true, key, h, nodes, node), true})
 		}
 	}
 
@@ -174,11 +181,26 @@ func (h *Policy) PredictNextNode(capPoints []CapacitorPoint, nodesInfo NodesInfo
 	sort.Sort(byNodesLeft{predictPoints})
 
 	for _, v := range predictPoints {
+		if v.nodesLeft >= worstCase {
+			break
+		}
+		if prediction := Predict(capPoints, v.CapacitorPoint); prediction > -1 {
+			if v.passed {
+				if prediction <= slo {
+					key, nodeInfo = v.key, nodesInfo.Matrix[v.key]
+					return
+				}
+			} else {
+				if prediction > slo {
+					key, nodeInfo = v.key, nodesInfo.Matrix[v.key]
+					return
+				}
+			}
+		}
 		fmt.Println(v)
 	}
 
-	fmt.Println("END - PredictNextNode")
-	return
+	return "", nil
 }
 
 func (h *ShortestPath) Exec(mode string, slo float32, wkls []string) (path ExecInfo, dspaceInfo map[string]NodesInfo) {
@@ -304,9 +326,9 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 		key, nodeInfo := h.NextConfig(&nodesInfo, nodes, level, wkl)
 
 		//Process main loop, basically there will be no blank space
-		var result Result
 		for h.c.HasMore(&nodesInfo) {
-			if !(nodeInfo.When != -1) {
+			var result Result
+			if nodeInfo.When == -1 {
 				result = h.c.Executor.Execute(*nodeInfo.Config, nodeInfo.WKL)
 				//log.Printf("[Policy.Exec] WKL:%v Result:%v\n", wkls[wkl], result)
 				execInfo.Path = fmt.Sprintf("%v%v->", execInfo.Path, key)
@@ -347,8 +369,6 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 				}
 
 			}
-			//TODO try predict best node to exec
-			h.PredictNextNode(capPoints, nodesInfo, slo, nodes)
 
 			if h.isCapacityFirst {
 				//select capacity level
@@ -387,6 +407,22 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 			//next config
 			if level != -1 {
 				key, nodeInfo = h.NextConfig(&nodesInfo, nodes, level, wkl)
+				if h.c.HasMore(&nodesInfo) {
+					if nodeInfo.When == -1 {
+						//h.PredictNextNode(capPoints, nodesInfo, key, float64(slo), nodes)
+					} else {
+						//find an equivalent
+						equivalent := nodes.Equivalents((&nodeInfo.Node))
+						for _, node := range equivalent {
+							localKey := GetMatrixKey(node.ID, wkl)
+							localNodeInfo := nodesInfo.Matrix[localKey]
+							if !(localNodeInfo.When == -1) {
+								//h.PredictNextNode(capPoints, nodesInfo, localKey, float64(slo), nodes)
+								break
+							}
+						}
+					}
+				}
 			}
 		}
 		//log.Printf("[Policy.Exec] Category:%v Execs:%v", cat, execInfo.execs)
