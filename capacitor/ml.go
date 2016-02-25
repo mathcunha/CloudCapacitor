@@ -164,11 +164,15 @@ func (u *USL) BuildUSL() {
 		if err != nil {
 			log.Printf("BuildUSL error parsing response %v: %v\n", out, err)
 		} else {
-			usl := values.Results.Output1.Value.Values[0][0]
-			usl = usl[1 : len(usl)-1]
-			err = json.Unmarshal([]byte(usl), u)
-			if err != nil {
-				log.Printf("BuildUSL error parsing response %v: %v\n", usl, err)
+			if len(values.Results.Output1.Value.Values) > 0 && len(values.Results.Output1.Value.Values[0]) > 0 {
+				usl := values.Results.Output1.Value.Values[0][0]
+				usl = usl[1 : len(usl)-1]
+				err = json.Unmarshal([]byte(usl), u)
+				if err != nil {
+					log.Printf("BuildUSL error parsing response %v: %v\n", usl, err)
+				}
+			} else {
+				log.Printf("coefficients not found for body %v and points %v\n", out, points)
 			}
 		}
 	}

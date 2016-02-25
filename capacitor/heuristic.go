@@ -197,7 +197,6 @@ func (h *Policy) PredictNextNode(capPoints []CapacitorPoint, nodesInfo NodesInfo
 				}
 			}
 		}
-		fmt.Println(v)
 	}
 
 	return "", nil
@@ -307,13 +306,13 @@ func (h *ExplorePath) Explore(slo float32, key string, nodesInfo *NodesInfo, exe
 
 func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, dspaceInfo map[string]NodesInfo) {
 	dspace := h.c.Dspace.CapacityBy(mode)
-	var capPoints []CapacitorPoint
 	execInfo := ExecInfo{0, ""}
 
 	//map to store the results by category
 	dspaceInfo = make(map[string]NodesInfo)
 
 	for _, cat := range h.c.Dspace.Categories() {
+		var capPoints []CapacitorPoint
 		nodes := (*dspace)[cat]
 		dspaceInfo[cat] = buildMatrix(wkls, nodes)
 
@@ -409,7 +408,8 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 				key, nodeInfo = h.NextConfig(&nodesInfo, nodes, level, wkl)
 				if h.c.HasMore(&nodesInfo) {
 					if nodeInfo.When == -1 {
-						//h.PredictNextNode(capPoints, nodesInfo, key, float64(slo), nodes)
+						guessedKey, _ := h.PredictNextNode(capPoints, nodesInfo, key, float64(slo), nodes)
+						fmt.Printf("picked %s, but my guess is %s\n", key, guessedKey)
 					} else {
 						//find an equivalent
 						equivalent := nodes.Equivalents((&nodeInfo.Node))
@@ -417,7 +417,8 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 							localKey := GetMatrixKey(node.ID, wkl)
 							localNodeInfo := nodesInfo.Matrix[localKey]
 							if !(localNodeInfo.When == -1) {
-								//h.PredictNextNode(capPoints, nodesInfo, localKey, float64(slo), nodes)
+								guessedKey, _ := h.PredictNextNode(capPoints, nodesInfo, localKey, float64(slo), nodes)
+								fmt.Printf("picked %s, but my guess is %s\n", key, guessedKey)
 								break
 							}
 						}
