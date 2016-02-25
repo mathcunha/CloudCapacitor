@@ -5,6 +5,7 @@ import (
 	"log"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -31,6 +32,22 @@ type ExecInfo struct {
 type NodeExec struct {
 	nodes NodesInfo
 	ExecInfo
+}
+
+type predictPoint struct {
+	CapacitorPoint
+	key       string
+	nodesLeft int
+	passed    bool
+}
+type byNodesLeft struct{ predictPoints []predictPoint }
+
+func (s byNodesLeft) Len() int { return len(s.predictPoints) }
+func (s byNodesLeft) Swap(i, j int) {
+	s.predictPoints[i], s.predictPoints[j] = s.predictPoints[j], s.predictPoints[i]
+}
+func (s byNodesLeft) Less(i, j int) bool {
+	return s.predictPoints[i].nodesLeft < s.predictPoints[j].nodesLeft
 }
 
 type Heuristic interface {
@@ -121,6 +138,47 @@ func (h *BrutalForce) Exec(mode string, slo float32, wkls []string) (path ExecIn
 		dspaceInfo[cat] = nodesInfo
 	}
 	return execInfo, dspaceInfo
+}
+
+func (h *Policy) PredictNextNode(capPoints []CapacitorPoint, nodesInfo NodesInfo, slo float32, nodes Nodes) (key string, nodeInfo NodeInfo) {
+	fmt.Println("INI PredictNextNode")
+	var predictPoints []predictPoint
+	//calc mark potential
+	for key, node := range nodesInfo.Matrix {
+		if !(node.When != -1) {
+			candidateNodesInfo := nodesInfo.Clone()
+			rejectNodesInfo := nodesInfo.Clone()
+			calcNodesLeft := func(localNodesInfo *NodesInfo, passed bool) int {
+				localNodesInfo.Mark(key, passed, 1, true)
+				//Equivalents Actions
+				if h.equiBehavior == Mark {
+					equivalent := nodes.Equivalents(&node.Node)
+					_, wkl := SplitMatrixKey(key)
+					for _, lNode := range equivalent {
+						lKey := GetMatrixKey(lNode.ID, wkl)
+						lNodeInfo := nodesInfo.Matrix[lKey]
+						if !(lNodeInfo.When != -1) {
+							localNodesInfo.Mark(lKey, passed, 1, false)
+						}
+					}
+				}
+				return h.c.NodesLeft(localNodesInfo)
+			}
+			wkl, _ := strconv.Atoi(node.WKL)
+			predictPoints = append(predictPoints, predictPoint{CapacitorPoint{config: *node.Config, wkl: wkl}, key, calcNodesLeft(rejectNodesInfo, false), false})
+			predictPoints = append(predictPoints, predictPoint{CapacitorPoint{config: *node.Config, wkl: wkl}, key, calcNodesLeft(candidateNodesInfo, true), true})
+		}
+	}
+
+	//asc order predictPoints
+	sort.Sort(byNodesLeft{predictPoints})
+
+	for _, v := range predictPoints {
+		fmt.Println(v)
+	}
+
+	fmt.Println("END - PredictNextNode")
+	return
 }
 
 func (h *ShortestPath) Exec(mode string, slo float32, wkls []string) (path ExecInfo, dspaceInfo map[string]NodesInfo) {
@@ -227,7 +285,7 @@ func (h *ExplorePath) Explore(slo float32, key string, nodesInfo *NodesInfo, exe
 
 func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, dspaceInfo map[string]NodesInfo) {
 	dspace := h.c.Dspace.CapacityBy(mode)
-
+	var capPoints []CapacitorPoint
 	execInfo := ExecInfo{0, ""}
 
 	//map to store the results by category
@@ -254,6 +312,9 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 				execInfo.Path = fmt.Sprintf("%v%v->", execInfo.Path, key)
 				execInfo.Execs++
 				(&nodesInfo).Mark(key, result.SLO <= slo, execInfo.Execs, true)
+				if s, err := strconv.Atoi(nodeInfo.WKL); err == nil {
+					capPoints = append(capPoints, CapacitorPoint{result.Config, s, float64(result.SLO)})
+				}
 			}
 
 			//Equivalents Actions
@@ -270,6 +331,9 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 						execInfo.Path = fmt.Sprintf("%v%v->", execInfo.Path, key)
 						execInfo.Execs++
 						(&nodesInfo).Mark(key, result.SLO <= slo, execInfo.Execs, true)
+						if s, err := strconv.Atoi(nodeInfo.WKL); err == nil {
+							capPoints = append(capPoints, CapacitorPoint{result.Config, s, float64(result.SLO)})
+						}
 					}
 				}
 			case Mark:
@@ -283,6 +347,8 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 				}
 
 			}
+			//TODO try predict best node to exec
+			h.PredictNextNode(capPoints, nodesInfo, slo, nodes)
 
 			if h.isCapacityFirst {
 				//select capacity level
