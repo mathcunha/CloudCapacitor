@@ -118,6 +118,45 @@ func (u *USL) Predict(x float64) (y float64) {
 	return
 }
 
+func (u *USL) callRScript(points string) {
+	cmd := exec.Command("Rscript", "--vanilla", "/home/vagrant/go/src/github.com/mathcunha/CloudCapacitor/config/usl.R", fmt.Sprintf("'%s'", points))
+	err := cmd.Run()
+	if err != nil {
+		log.Printf("callRScript error calling Rscript %v: %v\n", u, err)
+	}
+}
+
+func (u *USL) callAzureML(points string) {
+	body := fmt.Sprintf("{\"Inputs\": {\"input1\": {\"ColumnNames\": [\"points\"], \"Values\": [[%q]]}}, \"GlobalParameters\": {}}", points)
+	out, err := CallAzureMLService(body, azureAuth, azureEndPoint)
+	if err != nil {
+		log.Printf("BuildUSL error calling AzureMLService: %v\n", err)
+	} else {
+		values := struct {
+			Results struct {
+				Output1 struct {
+					//Value map[string][][]string
+					Value struct {
+						Values [][]string
+					}
+				} `json:"output1"`
+			}
+		}{}
+
+		err = json.Unmarshal([]byte(out), &values)
+		if err != nil {
+			log.Printf("BuildUSL error parsing response %v: %v\n", out, err)
+		} else {
+			usl := values.Results.Output1.Value.Values[0][0]
+			usl = usl[1 : len(usl)-1]
+			err = json.Unmarshal([]byte(usl), u)
+			if err != nil {
+				log.Printf("BuildUSL error parsing response %v: %v\n", usl, err)
+			}
+		}
+	}
+}
+
 func (u *USL) BuildUSL() {
 	u.R2 = -1
 	smaller := u.Points[0]
@@ -143,39 +182,7 @@ func (u *USL) BuildUSL() {
 
 	buf := bytes.NewBufferString("")
 	json.NewEncoder(buf).Encode(points)
-
-	body := fmt.Sprintf("{\"Inputs\": {\"input1\": {\"ColumnNames\": [\"points\"], \"Values\": [[%q]]}}, \"GlobalParameters\": {}}", buf.String())
-	out, err := CallAzureMLService(body, azureAuth, azureEndPoint)
-	if err != nil {
-		log.Printf("BuildUSL error calling AzureMLService: %v\n", err)
-	} else {
-		values := struct {
-			Results struct {
-				Output1 struct {
-					//Value map[string][][]string
-					Value struct {
-						Values [][]string
-					}
-				} `json:"output1"`
-			}
-		}{}
-
-		err = json.Unmarshal([]byte(out), &values)
-		if err != nil {
-			log.Printf("BuildUSL error parsing response %v: %v\n", out, err)
-		} else {
-			if len(values.Results.Output1.Value.Values) > 0 && len(values.Results.Output1.Value.Values[0]) > 0 {
-				usl := values.Results.Output1.Value.Values[0][0]
-				usl = usl[1 : len(usl)-1]
-				err = json.Unmarshal([]byte(usl), u)
-				if err != nil {
-					log.Printf("BuildUSL error parsing response %v: %v\n", usl, err)
-				}
-			} else {
-				log.Printf("coefficients not found for body %v and points %v\n", out, points)
-			}
-		}
-	}
+	u.callAzureML(buf.String())
 }
 
 func CallAzureMLService(body, auth, endpoint string) (out string, err error) {
