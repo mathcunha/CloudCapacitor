@@ -8,11 +8,13 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os/exec"
 	"time"
 )
 
 var azureEndPoint string
 var azureAuth string
+var local bool
 
 type CapacitorPoint struct {
 	config      Configuration
@@ -34,6 +36,7 @@ type USL struct {
 }
 
 func init() {
+	local = true
 	data, err := ioutil.ReadFile("config/azureml.yml")
 	if err != nil {
 		log.Printf("error reading azure file: %v\n", err)
@@ -55,6 +58,7 @@ func init() {
 	}
 	azureEndPoint = config.Endpoint
 	azureAuth = config.Auth
+	local = false
 }
 
 func Predict(capPoints []CapacitorPoint, capPoint CapacitorPoint) (performance float64) {
@@ -119,11 +123,17 @@ func (u *USL) Predict(x float64) (y float64) {
 }
 
 func (u *USL) callRScript(points string) {
-	cmd := exec.Command("Rscript", "--vanilla", "/home/vagrant/go/src/github.com/mathcunha/CloudCapacitor/config/usl.R", fmt.Sprintf("'%s'", points))
-	err := cmd.Run()
-	if err != nil {
-		log.Printf("callRScript error calling Rscript %v: %v\n", u, err)
+	cmd := exec.Command("Rscript", "--vanilla", "/home/vagrant/go/src/github.com/mathcunha/CloudCapacitor/config/usl.R", points)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("callRScript error calling Rscript :%v\n", err)
+		return
 	}
+	if err := json.Unmarshal(out.Bytes(), &[]*USL{u}); err != nil {
+		log.Printf("callRScript error parsing response %v: %v\n", out.String(), err)
+	}
+	return
 }
 
 func (u *USL) callAzureML(points string) {
@@ -182,7 +192,11 @@ func (u *USL) BuildUSL() {
 
 	buf := bytes.NewBufferString("")
 	json.NewEncoder(buf).Encode(points)
-	u.callAzureML(buf.String())
+	if local {
+		u.callRScript(buf.String())
+	} else {
+		u.callAzureML(buf.String())
+	}
 }
 
 func CallAzureMLService(body, auth, endpoint string) (out string, err error) {
