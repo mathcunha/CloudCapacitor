@@ -16,7 +16,7 @@ func TestHeuristicConservative(t *testing.T) {
 		t.Errorf("config error")
 	}
 	c := Capacitor{dspace, m}
-	h := NewPolicy(&c, Conservative, Conservative, 1, true)
+	h := NewPolicy(&c, Conservative, Conservative, 1, true, false)
 	mode := "Strict"
 	wkls := []string{"100", "200", "300", "400", "500", "600", "700", "800", "900", "1000"}
 	execInfo, _ := h.Exec(mode, float32(20000), wkls)
@@ -42,7 +42,7 @@ func TestHeuristicOptimistic(t *testing.T) {
 		t.Errorf("config error")
 	}
 	c := Capacitor{dspace, m}
-	h := NewPolicy(&c, Optimistic, Optimistic, 1, true)
+	h := NewPolicy(&c, Optimistic, Optimistic, 1, true, false)
 	mode := "Strict"
 	wkls := []string{"100", "200", "300", "400", "500", "600", "700", "800", "900", "1000"}
 	execInfo, _ := h.Exec(mode, float32(20000), wkls)
@@ -68,7 +68,7 @@ func TestHeuristicPessimistic(t *testing.T) {
 		t.Errorf("config error")
 	}
 	c := Capacitor{dspace, m}
-	h := NewPolicy(&c, Pessimistic, Pessimistic, 1, true)
+	h := NewPolicy(&c, Pessimistic, Pessimistic, 1, true, false)
 	mode := "Strict"
 	wkls := []string{"100", "200", "300", "400", "500", "600", "700", "800", "900", "1000"}
 	execInfo, _ := h.Exec(mode, float32(20000), wkls)

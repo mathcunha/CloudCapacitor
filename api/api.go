@@ -180,6 +180,7 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 			EquiBehavior    int     `json:"equiBehavior"`
 			App             string  `json:"app"`
 			IsCapacityFirst bool    `json:"isCapacityFirst"`
+			UseML           bool
 		}
 
 		err := json.NewDecoder(r.Body).Decode(&config)
@@ -230,7 +231,7 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 		case "sp":
 			h = capacitor.NewShortestPath(&c, config.EquiBehavior)
 		default:
-			h = capacitor.NewPolicy(&c, config.Configuration, config.WKL, config.EquiBehavior, config.IsCapacityFirst)
+			h = capacitor.NewPolicy(&c, config.Configuration, config.WKL, config.EquiBehavior, config.IsCapacityFirst, config.UseML)
 		}
 
 		execInfo, dspaceInfo := h.Exec(config.Mode, config.Slo, wkls)

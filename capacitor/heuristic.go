@@ -78,9 +78,10 @@ type Policy struct {
 	wklPolicy       string
 	equiBehavior    int
 	isCapacityFirst bool
+	useML           bool
 }
 
-func NewPolicy(c *Capacitor, levelPolicy string, wklPolicy string, equiBehavior int, isCapacityFirst bool) (h *Policy) {
+func NewPolicy(c *Capacitor, levelPolicy string, wklPolicy string, equiBehavior int, isCapacityFirst bool, useML bool) (h *Policy) {
 	switch levelPolicy {
 	case Conservative, Pessimistic, Optimistic, Hybrid, Sensitive, Adaptative, Truth:
 	default:
@@ -96,7 +97,7 @@ func NewPolicy(c *Capacitor, levelPolicy string, wklPolicy string, equiBehavior 
 	default:
 		log.Panicf("NewPolicy: equiBehavior not available:%v", equiBehavior)
 	}
-	return &(Policy{c, levelPolicy, wklPolicy, equiBehavior, isCapacityFirst})
+	return &(Policy{c, levelPolicy, wklPolicy, equiBehavior, isCapacityFirst, useML})
 }
 
 func NewShortestPath(c *Capacitor, equiBehavior int) (h *ShortestPath) {
@@ -406,10 +407,11 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 			//next config
 			if level != -1 {
 				key, nodeInfo = h.NextConfig(&nodesInfo, nodes, level, wkl)
-				if h.c.HasMore(&nodesInfo) {
+				if h.useML && h.c.HasMore(&nodesInfo) {
 					if nodeInfo.When == -1 {
-						guessedKey, _ := h.PredictNextNode(capPoints, nodesInfo, key, float64(slo), nodes)
-						fmt.Printf("picked %s, but my guess is %s\n", key, guessedKey)
+						if guessedKey, _ := h.PredictNextNode(capPoints, nodesInfo, key, float64(slo), nodes); len(guessedKey) > 0 {
+							fmt.Printf("picked %s, but my guess is %s\n", key, guessedKey)
+						}
 					} else {
 						//find an equivalent
 						equivalent := nodes.Equivalents((&nodeInfo.Node))
@@ -417,9 +419,10 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 							localKey := GetMatrixKey(node.ID, wkl)
 							localNodeInfo := nodesInfo.Matrix[localKey]
 							if !(localNodeInfo.When == -1) {
-								guessedKey, _ := h.PredictNextNode(capPoints, nodesInfo, localKey, float64(slo), nodes)
-								fmt.Printf("picked %s, but my guess is %s\n", key, guessedKey)
-								break
+								if guessedKey, _ := h.PredictNextNode(capPoints, nodesInfo, localKey, float64(slo), nodes); len(guessedKey) > 0 {
+									fmt.Printf("picked %s, but my guess is %s\n", key, guessedKey)
+									break
+								}
 							}
 						}
 					}
