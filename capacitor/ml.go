@@ -63,28 +63,30 @@ func init() {
 
 func Predict(capPoints []CapacitorPoint, capPoint CapacitorPoint) (performance float64) {
 	performance = -1
-	if points := pointsByThroughput(capPoints, capPoint); len(points) > 1 {
+	if points := pointsByConfiguration(capPoints, capPoint); len(points) > 1 {
 		usl := USL{Points: points}
 		usl.BuildUSL()
-		if usl.R2 >= 0.7 {
-			performance = float64(capPoint.wkl) / usl.Predict(float64(capPoint.config.CPU()))
-			fmt.Printf("uslByThroughput prediction of %v is %f\n", capPoint, performance)
-		}
+		performance = usl.Predict(float64(capPoint.wkl))
+		fmt.Printf("uslByConfig\tprediction of (%d)%s#%d is %f\n", capPoint.config.Size, capPoint.config.VM.Name, capPoint.wkl, performance)
+		return
 	}
 	if points := pointsByWorkload(capPoints, capPoint); len(points) > 1 {
 		usl := USL{Points: points, Y1IsMax: true}
 		usl.BuildUSL()
 		if usl.R2 >= 0.7 {
 			performance = usl.Predict(float64(capPoint.config.CPU()))
-			fmt.Printf("uslByWorkload prediction of %v is %f\n", capPoint, performance)
+			fmt.Printf("uslByWorkload\tprediction of (%d)%s#%d is %f\n", capPoint.config.Size, capPoint.config.VM.Name, capPoint.wkl, performance)
 		}
+		return
 	}
-
-	if points := pointsByConfiguration(capPoints, capPoint); len(points) > 1 {
+	if points := pointsByThroughput(capPoints, capPoint); len(points) > 1 {
 		usl := USL{Points: points}
 		usl.BuildUSL()
-		performance = usl.Predict(float64(capPoint.wkl))
-		fmt.Printf("uslByConfiguration prediction of %v is %f\n", capPoint, performance)
+		if usl.R2 >= 0.7 {
+			performance = float64(capPoint.wkl) / usl.Predict(float64(capPoint.config.CPU()))
+			fmt.Printf("uslByThrput\tprediction of (%d)%s#%d is %f\n", capPoint.config.Size, capPoint.config.VM.Name, capPoint.wkl, performance)
+		}
+		return
 	}
 	return
 }

@@ -409,8 +409,10 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 				key, nodeInfo = h.NextConfig(&nodesInfo, nodes, level, wkl)
 				if h.useML && h.c.HasMore(&nodesInfo) {
 					if nodeInfo.When == -1 {
-						if guessedKey, _ := h.PredictNextNode(capPoints, nodesInfo, key, float64(slo), nodes); len(guessedKey) > 0 {
+						if guessedKey, lNodeInfo := h.PredictNextNode(capPoints, nodesInfo, key, float64(slo), nodes); len(guessedKey) > 0 {
 							fmt.Printf("picked %s, but my guess is %s\n", key, guessedKey)
+							key, nodeInfo = guessedKey, lNodeInfo
+
 						}
 					} else {
 						//find an equivalent
@@ -419,8 +421,9 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 							localKey := GetMatrixKey(node.ID, wkl)
 							localNodeInfo := nodesInfo.Matrix[localKey]
 							if !(localNodeInfo.When == -1) {
-								if guessedKey, _ := h.PredictNextNode(capPoints, nodesInfo, localKey, float64(slo), nodes); len(guessedKey) > 0 {
+								if guessedKey, lNodeInfo := h.PredictNextNode(capPoints, nodesInfo, localKey, float64(slo), nodes); len(guessedKey) > 0 {
 									fmt.Printf("picked %s, but my guess is %s\n", key, guessedKey)
+									key, nodeInfo = guessedKey, lNodeInfo
 									break
 								}
 							}
