@@ -180,12 +180,18 @@ func (h *Policy) PredictNextNode(capPoints []CapacitorPoint, nodesInfo NodesInfo
 
 	//asc order predictPoints
 	sort.Sort(byNodesLeft{predictPoints})
+	mapPrediction := make(map[string]float64)
 
 	for _, v := range predictPoints {
 		if v.nodesLeft >= worstCase {
 			break
 		}
-		if prediction := Predict(capPoints, v.CapacitorPoint); prediction > -1 {
+		prediction, has := mapPrediction[v.key]
+		if !has {
+			prediction = Predict(capPoints, v.CapacitorPoint)
+			mapPrediction[v.key] = prediction
+		}
+		if prediction > -1 {
 			if v.passed {
 				if prediction <= slo {
 					key, nodeInfo = v.key, nodesInfo.Matrix[v.key]
