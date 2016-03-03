@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"os/exec"
 	"time"
 )
@@ -40,7 +41,7 @@ func init() {
 	data, err := ioutil.ReadFile("config/azureml.yml")
 	if err != nil {
 		log.Printf("error reading azure file: %v\n", err)
-		data, err = ioutil.ReadFile("/home/vagrant/go/src/github.com/mathcunha/CloudCapacitor/config/azureml.yml")
+		data, err = ioutil.ReadFile(os.Getenv("GOPATH") + "/src/github.com/mathcunha/CloudCapacitor/config/azureml.yml")
 		if err != nil {
 			log.Printf("error reading azure file: %v\n", err)
 			return

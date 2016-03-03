@@ -333,6 +333,7 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 
 		//Process main loop, basically there will be no blank space
 		for h.c.HasMore(&nodesInfo) {
+			currentExec := execInfo.Execs
 			var result Result
 			if nodeInfo.When == -1 {
 				result = h.c.Executor.Execute(*nodeInfo.Config, nodeInfo.WKL)
@@ -351,6 +352,10 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 			case Exec:
 				//execute all equivalents
 				for _, node := range equivalent {
+					//just one exec
+					if h.useML && execInfo.Execs != currentExec {
+						break
+					}
 					key = GetMatrixKey(node.ID, wkl)
 					nodeInfo = nodesInfo.Matrix[key]
 					if !(nodeInfo.When != -1) {
@@ -361,10 +366,6 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 						(&nodesInfo).Mark(key, result.SLO <= slo, execInfo.Execs, true)
 						if s, err := strconv.Atoi(nodeInfo.WKL); err == nil {
 							capPoints = append(capPoints, CapacitorPoint{result.Config, s, float64(result.SLO)})
-						}
-						//just one exec
-						if h.useML {
-							break
 						}
 					}
 				}
