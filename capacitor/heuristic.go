@@ -362,6 +362,10 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 						if s, err := strconv.Atoi(nodeInfo.WKL); err == nil {
 							capPoints = append(capPoints, CapacitorPoint{result.Config, s, float64(result.SLO)})
 						}
+						//just one exec
+						if h.useML {
+							break
+						}
 					}
 				}
 			case Mark:
