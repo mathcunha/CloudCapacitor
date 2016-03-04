@@ -47,6 +47,12 @@ func (s byNodesLeft) Swap(i, j int) {
 	s.predictPoints[i], s.predictPoints[j] = s.predictPoints[j], s.predictPoints[i]
 }
 func (s byNodesLeft) Less(i, j int) bool {
+	if s.predictPoints[i].nodesLeft == s.predictPoints[j].nodesLeft {
+		if s.predictPoints[i].CapacitorPoint.config.Size == s.predictPoints[j].CapacitorPoint.config.Size {
+			return s.predictPoints[i].CapacitorPoint.config.VM.Name < s.predictPoints[j].CapacitorPoint.config.VM.Name
+		}
+		return s.predictPoints[i].CapacitorPoint.config.Size < s.predictPoints[j].CapacitorPoint.config.Size
+	}
 	return s.predictPoints[i].nodesLeft < s.predictPoints[j].nodesLeft
 }
 
@@ -454,15 +460,10 @@ func (p *Policy) NextConfig(nodesInfo *NodesInfo, nodes Nodes, level int, wkl in
 	nodeInfo = nodesInfo.Matrix[key]
 
 	if nodeInfo != nil {
-		//it is ordered
-		equivalent := nodes.Equivalents((&nodeInfo.Node))
-		if len(equivalent) > 0 {
-			node := equivalent[0]
-			if node.Config.Size < nodeInfo.Config.Size {
-				key = GetMatrixKey(node.ID, wkl)
-				nodeInfo = nodesInfo.Matrix[key]
-			}
-		}
+		equivalent := append(nodes.Equivalents((&nodeInfo.Node)), &nodeInfo.Node)
+		sort.Sort(bySize{equivalent})
+		key = GetMatrixKey(equivalent[0].ID, wkl)
+		nodeInfo = nodesInfo.Matrix[key]
 	}
 	return
 }
