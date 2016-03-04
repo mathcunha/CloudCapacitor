@@ -36,9 +36,10 @@ type NodeExec struct {
 
 type predictPoint struct {
 	CapacitorPoint
-	key       string
-	nodesLeft int
-	passed    bool
+	key        string
+	nodesLeft  int
+	passed     bool
+	prediction float64
 }
 type byNodesLeft struct{ predictPoints []predictPoint }
 
@@ -166,7 +167,7 @@ func whatIfNodesLeft(nodesInfo *NodesInfo, passed bool, key string, h *Policy, n
 	return h.c.NodesLeft(localNodesInfo)
 }
 
-func (h *Policy) PredictNextNode(capPoints []CapacitorPoint, nodesInfo NodesInfo, nextKey string, slo float64, nodes Nodes) (key string, nodeInfo *NodeInfo) {
+func (h *Policy) PredictNextNode(capPoints []CapacitorPoint, nodesInfo NodesInfo, nextKey string, slo float64, nodes Nodes) *predictPoint {
 	//select by the Policy
 	worstCase := whatIfNodesLeft(nodesInfo.Clone(), false, nextKey, h, nodes, nodesInfo.Matrix[nextKey])
 	if nodesLeft := whatIfNodesLeft(nodesInfo.Clone(), true, nextKey, h, nodes, nodesInfo.Matrix[nextKey]); nodesLeft > worstCase {
@@ -179,8 +180,8 @@ func (h *Policy) PredictNextNode(capPoints []CapacitorPoint, nodesInfo NodesInfo
 	for key, node := range nodesInfo.Matrix {
 		if !(node.When != -1) {
 			wkl, _ := strconv.Atoi(node.WKL)
-			predictPoints = append(predictPoints, predictPoint{CapacitorPoint{config: *node.Config, wkl: wkl}, key, whatIfNodesLeft(nodesInfo.Clone(), false, key, h, nodes, node), false})
-			predictPoints = append(predictPoints, predictPoint{CapacitorPoint{config: *node.Config, wkl: wkl}, key, whatIfNodesLeft(nodesInfo.Clone(), true, key, h, nodes, node), true})
+			predictPoints = append(predictPoints, predictPoint{CapacitorPoint: CapacitorPoint{config: *node.Config, wkl: wkl}, key: key, nodesLeft: whatIfNodesLeft(nodesInfo.Clone(), false, key, h, nodes, node), passed: false})
+			predictPoints = append(predictPoints, predictPoint{CapacitorPoint: CapacitorPoint{config: *node.Config, wkl: wkl}, key: key, nodesLeft: whatIfNodesLeft(nodesInfo.Clone(), true, key, h, nodes, node), passed: true})
 		}
 	}
 
@@ -200,19 +201,19 @@ func (h *Policy) PredictNextNode(capPoints []CapacitorPoint, nodesInfo NodesInfo
 		if prediction > -1 {
 			if v.passed {
 				if prediction <= slo {
-					key, nodeInfo = v.key, nodesInfo.Matrix[v.key]
-					return
+					v.prediction = prediction
+					return &v
 				}
 			} else {
 				if prediction > slo {
-					key, nodeInfo = v.key, nodesInfo.Matrix[v.key]
-					return
+					v.prediction = prediction
+					return &v
 				}
 			}
 		}
 	}
 
-	return "", nil
+	return nil
 }
 
 func (h *ShortestPath) Exec(mode string, slo float32, wkls []string) (path ExecInfo, dspaceInfo map[string]NodesInfo) {
@@ -425,12 +426,10 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 			if level != -1 {
 				key, nodeInfo = h.NextConfig(&nodesInfo, nodes, level, wkl)
 				if h.useML && h.c.HasMore(&nodesInfo) {
+					prediction := new(predictPoint)
+					prediction = nil
 					if nodeInfo.When == -1 {
-						if guessedKey, lNodeInfo := h.PredictNextNode(capPoints, nodesInfo, key, float64(slo), nodes); len(guessedKey) > 0 {
-							fmt.Printf("picked %s, but my guess is %s\n", key, guessedKey)
-							key, nodeInfo = guessedKey, lNodeInfo
-
-						}
+						prediction = h.PredictNextNode(capPoints, nodesInfo, key, float64(slo), nodes)
 					} else {
 						//find an equivalent
 						equivalent := nodes.Equivalents((&nodeInfo.Node))
@@ -438,13 +437,22 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 							localKey := GetMatrixKey(node.ID, wkl)
 							localNodeInfo := nodesInfo.Matrix[localKey]
 							if !(localNodeInfo.When == -1) {
-								if guessedKey, lNodeInfo := h.PredictNextNode(capPoints, nodesInfo, localKey, float64(slo), nodes); len(guessedKey) > 0 {
-									fmt.Printf("picked %s, but my guess is %s\n", key, guessedKey)
-									key, nodeInfo = guessedKey, lNodeInfo
+								prediction = h.PredictNextNode(capPoints, nodesInfo, localKey, float64(slo), nodes)
+								if prediction != nil {
 									break
 								}
 							}
 						}
+					}
+					if prediction != nil {
+						ratio := float64(0)
+						if prediction.passed {
+							ratio = 1 - (prediction.prediction / float64(slo))
+						} else {
+							ratio = (prediction.prediction / float64(slo)) - 1
+						}
+						fmt.Printf("picked %s, but my guess is %s by %.4f\n", key, prediction.key, ratio)
+						key, nodeInfo = prediction.key, nodesInfo.Matrix[prediction.key]
 					}
 				}
 			}
