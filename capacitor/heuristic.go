@@ -40,6 +40,7 @@ type predictPoint struct {
 	nodesLeft  int
 	passed     bool
 	prediction float64
+	ratio      float64
 }
 type byNodesLeft struct{ predictPoints []predictPoint }
 
@@ -50,7 +51,10 @@ func (s byNodesLeft) Swap(i, j int) {
 func (s byNodesLeft) Less(i, j int) bool {
 	if s.predictPoints[i].nodesLeft == s.predictPoints[j].nodesLeft {
 		if s.predictPoints[i].CapacitorPoint.config.Size == s.predictPoints[j].CapacitorPoint.config.Size {
-			return s.predictPoints[i].CapacitorPoint.config.VM.Name < s.predictPoints[j].CapacitorPoint.config.VM.Name
+			if s.predictPoints[i].CapacitorPoint.config.VM.CPU == s.predictPoints[j].CapacitorPoint.config.VM.CPU {
+				return s.predictPoints[i].wkl < s.predictPoints[j].wkl
+			}
+			return s.predictPoints[i].CapacitorPoint.config.VM.CPU < s.predictPoints[j].CapacitorPoint.config.VM.CPU
 		}
 		return s.predictPoints[i].CapacitorPoint.config.Size < s.predictPoints[j].CapacitorPoint.config.Size
 	}
@@ -202,11 +206,13 @@ func (h *Policy) PredictNextNode(capPoints []CapacitorPoint, nodesInfo NodesInfo
 			if v.passed {
 				if prediction <= slo {
 					v.prediction = prediction
+					v.ratio = 1 - (prediction / float64(slo))
 					return &v
 				}
 			} else {
 				if prediction > slo {
 					v.prediction = prediction
+					v.ratio = (prediction / float64(slo)) - 1
 					return &v
 				}
 			}
@@ -337,20 +343,35 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 		level := h.selectCapacityLevel(&nodesInfo, key, &nodes, nil, slo)
 		wkl := h.selectWorkload(&nodesInfo, key, nil, slo)
 		key, nodeInfo := h.NextConfig(&nodesInfo, nodes, level, wkl)
+		var prediction *predictPoint
 
 		//Process main loop, basically there will be no blank space
 		for h.c.HasMore(&nodesInfo) {
 			currentExec := execInfo.Execs
 			var result Result
 			if nodeInfo.When == -1 {
-				result = h.c.Executor.Execute(*nodeInfo.Config, nodeInfo.WKL)
-				//log.Printf("[Policy.Exec] WKL:%v Result:%v\n", wkls[wkl], result)
-				execInfo.Path = fmt.Sprintf("%v%v->", execInfo.Path, key)
-				execInfo.Execs++
-				(&nodesInfo).Mark(key, result.SLO <= slo, execInfo.Execs, true)
-				if s, err := strconv.Atoi(nodeInfo.WKL); err == nil {
-					capPoints = append(capPoints, CapacitorPoint{result.Config, s, float64(result.SLO)})
+				predicted := false
+				if prediction != nil {
+					if prediction.ratio >= 2.0 {
+						predicted = true
+						(&nodesInfo).Mark(key, prediction.passed, execInfo.Execs, false)
+					}
 				}
+				if !predicted {
+					result = h.c.Executor.Execute(*nodeInfo.Config, nodeInfo.WKL)
+					//log.Printf("[Policy.Exec] WKL:%v Result:%v\n", wkls[wkl], result)
+					if prediction != nil {
+						fmt.Printf("%s - real:{%t,%.4f} predict:{%t,%.4f} ratio:%.4f\n", prediction.key, result.SLO <= slo, result.SLO, prediction.passed, prediction.prediction, prediction.ratio)
+					}
+
+					execInfo.Path = fmt.Sprintf("%v%v->", execInfo.Path, key)
+					execInfo.Execs++
+					(&nodesInfo).Mark(key, result.SLO <= slo, execInfo.Execs, true)
+					if s, err := strconv.Atoi(nodeInfo.WKL); err == nil {
+						capPoints = append(capPoints, CapacitorPoint{result.Config, s, float64(result.SLO)})
+					}
+				}
+				prediction = nil
 			}
 
 			//Equivalents Actions
@@ -426,7 +447,6 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 			if level != -1 {
 				key, nodeInfo = h.NextConfig(&nodesInfo, nodes, level, wkl)
 				if h.useML && h.c.HasMore(&nodesInfo) {
-					prediction := new(predictPoint)
 					prediction = nil
 					if nodeInfo.When == -1 {
 						prediction = h.PredictNextNode(capPoints, nodesInfo, key, float64(slo), nodes)
@@ -445,13 +465,7 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 						}
 					}
 					if prediction != nil {
-						ratio := float64(0)
-						if prediction.passed {
-							ratio = 1 - (prediction.prediction / float64(slo))
-						} else {
-							ratio = (prediction.prediction / float64(slo)) - 1
-						}
-						fmt.Printf("picked %s, but my guess is %s by %.4f\n", key, prediction.key, ratio)
+						//fmt.Printf("picked %s, but my guess is %s by %t %.4f\n", key, prediction.key, prediction.passed, prediction.ratio)
 						key, nodeInfo = prediction.key, nodesInfo.Matrix[prediction.key]
 					}
 				}

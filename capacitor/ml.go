@@ -126,7 +126,7 @@ func (u *USL) Predict(x float64) (y float64) {
 }
 
 func (u *USL) callRScript(points string) {
-	cmd := exec.Command("Rscript", "--vanilla", os.Getenv("GOPATH") + "/src/github.com/mathcunha/CloudCapacitor/config/usl.R", points)
+	cmd := exec.Command("Rscript", "--vanilla", os.Getenv("GOPATH")+"/src/github.com/mathcunha/CloudCapacitor/config/usl.R", points)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
