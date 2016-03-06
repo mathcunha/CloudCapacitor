@@ -75,7 +75,7 @@ func Predict(capPoints []CapacitorPoint, capPoint CapacitorPoint) (performance f
 		usl := USL{Points: points, Y1IsMax: true}
 		usl.BuildUSL()
 		if usl.R2 >= 0.7 {
-			performance = usl.Predict(float64(capPoint.config.CPU()))
+			performance = usl.Predict(workloadModelX(capPoint))
 			fmt.Printf("uslByWorkload\tprediction of (%d)%s#%d is %f\n", capPoint.config.Size, capPoint.config.VM.Name, capPoint.wkl, performance)
 		}
 		return
@@ -108,10 +108,15 @@ func pointsByConfiguration(capPoints []CapacitorPoint, capPoint CapacitorPoint) 
 	return
 }
 
+func workloadModelX(v CapacitorPoint) (x float64) {
+	x = (0.3 * float64(v.config.Size)) + (0.7 * float64(v.config.VM.CPU))
+	return
+}
+
 func pointsByWorkload(capPoints []CapacitorPoint, capPoint CapacitorPoint) (points Points) {
 	for _, v := range capPoints {
 		if v.wkl == capPoint.wkl {
-			points = append(points, Point{float64(v.config.CPU()), float64(v.performance)})
+			points = append(points, Point{float64(workloadModelX(v)), float64(v.performance)})
 		}
 	}
 	return
@@ -181,11 +186,11 @@ func (u *USL) BuildUSL() {
 
 	points := Points{}
 	if smaller.X != 1 {
-		factor := 1.0 / smaller.X
+		//factor := 1.0 / smaller.X
 		if u.Y1IsMax {
-			smaller.X, smaller.Y = 1, smaller.Y*(1+factor)
+			smaller.X, smaller.Y = 1, smaller.Y*smaller.X
 		} else {
-			smaller.X, smaller.Y = 1, smaller.Y*factor
+			smaller.X, smaller.Y = 1, smaller.Y/smaller.X
 		}
 		points = append(points, smaller)
 	}
