@@ -62,39 +62,42 @@ func init() {
 	local = false
 }
 
-func Predict(capPoints []CapacitorPoint, capPoint CapacitorPoint) (performance float64) {
+func Predict(capPoints []CapacitorPoint, capPoint CapacitorPoint) (performance float64, model string) {
 	performance = -1
-	if points := pointsByConfiguration(capPoints, capPoint); len(points) > 1 {
-		usl := USL{Points: points}
-		usl.BuildUSL()
-		performance = usl.Predict(float64(capPoint.wkl))
-		fmt.Printf("uslByConfig\tprediction of (%d)%s#%d is %f\n", capPoint.config.Size, capPoint.config.VM.Name, capPoint.wkl, performance)
-		return
-	}
-	if points := pointsByWorkload(capPoints, capPoint); len(points) > 1 {
-		usl := USL{Points: points, Y1IsMax: true}
-		usl.BuildUSL()
-		if usl.R2 >= 0.7 {
-			performance = usl.Predict(workloadModelX(capPoint))
-			fmt.Printf("uslByWorkload\tprediction of (%d)%s#%d is %f\n", capPoint.config.Size, capPoint.config.VM.Name, capPoint.wkl, performance)
+	model = ""
+	/*
+		if points := pointsByConfiguration(capPoints, capPoint); len(points) > 1 {
+			usl := USL{Points: points}
+			usl.BuildUSL()
+			performance = usl.Predict(float64(capPoint.wkl))
+			model = "uslByConfig"
+			return
 		}
-		return
-	}
+		if points := pointsByWorkload(capPoints, capPoint); len(points) > 1 {
+			usl := USL{Points: points, Y1IsMax: true}
+			usl.BuildUSL()
+			if usl.R2 >= 0.7 {
+				performance = usl.Predict(workloadModelX(capPoint))
+				model = "uslByWorkload"
+				return
+			}
+		}
+	*/
 	if points := pointsByThroughput(capPoints, capPoint); len(points) > 1 {
 		usl := USL{Points: points}
 		usl.BuildUSL()
 		if usl.R2 >= 0.7 {
-			performance = float64(capPoint.wkl) / usl.Predict(float64(capPoint.config.CPU()))
-			fmt.Printf("uslByThrput\tprediction of (%d)%s#%d is %f\n", capPoint.config.Size, capPoint.config.VM.Name, capPoint.wkl, performance)
+			performance = float64(capPoint.wkl) / usl.Predict(workloadModelX(capPoint))
+			model = "uslByThrput"
+			return
 		}
-		return
 	}
 	return
 }
 
 func pointsByThroughput(capPoints []CapacitorPoint, capPoint CapacitorPoint) (points Points) {
 	for _, v := range capPoints {
-		points = append(points, Point{float64(v.config.CPU()), float64(v.wkl) / v.performance})
+		points = append(points, Point{workloadModelX(v), float64(v.wkl) / v.performance})
 	}
 	return
 }

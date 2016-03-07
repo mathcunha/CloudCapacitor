@@ -55,21 +55,20 @@ func TestMachineLearningWorkload(t *testing.T) {
 	//wkls := []string{"10000000", "20000000", "30000000", "40000000", "50000000"}
 	configs := (*dspace.configs)["c3"]
 	i := 0
-	capPoints := make([]CapacitorPoint, 3, 3)
+	capPoints := make([]CapacitorPoint, 2, 2)
 
 	result := m.Execute(*configs[0], "10000000")
 	capPoints[i] = CapacitorPoint{result.Config, 10000000, float64(result.SLO)}
 	i++
 
-	result = m.Execute(*configs[len(configs)-1], "10000000")
-	capPoints[i] = CapacitorPoint{result.Config, 10000000, float64(result.SLO)}
+	result = m.Execute(*configs[len(configs)-1], "50000000")
+	capPoints[i] = CapacitorPoint{result.Config, 50000000, float64(result.SLO)}
 	i++
 
-	result = m.Execute(*configs[len(configs)/2], "10000000")
-	capPoints[i] = CapacitorPoint{result.Config, 10000000, float64(result.SLO)}
-	i++
+	prediction, modelName := Predict(capPoints, CapacitorPoint{config: *configs[1], wkl: 20000000})
+	result = m.Execute(*configs[1], "20000000")
+	fmt.Printf("%q,%.4f,%.4f\n", modelName, result.SLO, prediction)
 
-	Predict(capPoints, CapacitorPoint{config: *configs[1], wkl: 10000000})
 }
 
 func TestMachineLearningConfiguration(t *testing.T) {

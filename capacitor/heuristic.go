@@ -41,6 +41,7 @@ type predictPoint struct {
 	passed     bool
 	prediction float64
 	ratio      float64
+	modelName  string
 }
 type byNodesLeft struct{ predictPoints []predictPoint }
 
@@ -192,27 +193,32 @@ func (h *Policy) PredictNextNode(capPoints []CapacitorPoint, nodesInfo NodesInfo
 	//asc order predictPoints
 	sort.Sort(byNodesLeft{predictPoints})
 	mapPrediction := make(map[string]float64)
+	mapModelName := make(map[string]string)
 
 	for _, v := range predictPoints {
 		if v.nodesLeft >= worstCase {
 			break
 		}
 		prediction, has := mapPrediction[v.key]
+		model := mapModelName[v.key]
 		if !has {
-			prediction = Predict(capPoints, v.CapacitorPoint)
+			prediction, model = Predict(capPoints, v.CapacitorPoint)
 			mapPrediction[v.key] = prediction
+			mapModelName[v.key] = model
 		}
 		if prediction > -1 {
 			if v.passed {
 				if prediction <= slo {
 					v.prediction = prediction
 					v.ratio = 1 - (prediction / float64(slo))
+					v.modelName = model
 					return &v
 				}
 			} else {
 				if prediction > slo {
 					v.prediction = prediction
 					v.ratio = (prediction / float64(slo)) - 1
+					v.modelName = model
 					return &v
 				}
 			}
@@ -324,6 +330,21 @@ func (h *ExplorePath) Explore(slo float32, key string, nodesInfo *NodesInfo, exe
 	return ExecInfo{-1, ""}, nodesInfo
 }
 
+func rampUpModelsWorkload(nodes Nodes, nodesInfo NodesInfo) (path []string) {
+	for w := 0; w < nodesInfo.Workloads; w++ {
+		n := nodes.NodeByLevel(1)
+		path = append(path, GetMatrixKey(n.ID, w))
+		n = nodes.NodeByLevel(nodesInfo.Levels)
+		path = append(path, GetMatrixKey(n.ID, w))
+	}
+	return
+}
+
+func rampUpModelsThrput(nodes Nodes, nodesInfo NodesInfo) (path []string) {
+	path = append(path, GetMatrixKey(nodes.NodeByLevel(1).ID, 0), GetMatrixKey(nodes.NodeByLevel(nodesInfo.Levels).ID, nodesInfo.Workloads-1), GetMatrixKey(nodes.NodeByLevel(nodesInfo.Levels/2).ID, nodesInfo.Workloads/2))
+	return
+}
+
 func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, dspaceInfo map[string]NodesInfo) {
 	dspace := h.c.Dspace.CapacityBy(mode)
 	execInfo := ExecInfo{0, ""}
@@ -338,6 +359,10 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 
 		nodesInfo := dspaceInfo[cat]
 
+		//rampUpModelsPath := rampUpModelsWorkload(nodes, nodesInfo)
+		rampUpModelsPath := rampUpModelsThrput(nodes, nodesInfo)
+		executedRampUp := 0
+
 		key := h.selectStartingPoint(&nodesInfo, &nodes)
 
 		level := h.selectCapacityLevel(&nodesInfo, key, &nodes, nil, slo)
@@ -349,19 +374,35 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 		for h.c.HasMore(&nodesInfo) {
 			currentExec := execInfo.Execs
 			var result Result
+			if h.useML && executedRampUp != len(rampUpModelsPath) {
+				key = rampUpModelsPath[executedRampUp]
+				executedRampUp++
+				nodeInfo = nodesInfo.Matrix[key]
+				execInfo.Path = fmt.Sprintf("%v%v->", execInfo.Path, key)
+				execInfo.Execs++
+				result = h.c.Executor.Execute(*nodeInfo.Config, nodeInfo.WKL)
+				(&nodesInfo).Mark(key, result.SLO <= slo, execInfo.Execs, true)
+				if s, err := strconv.Atoi(nodeInfo.WKL); err == nil {
+					capPoints = append(capPoints, CapacitorPoint{result.Config, s, float64(result.SLO)})
+				}
+				if executedRampUp != len(rampUpModelsPath) {
+					continue
+				}
+			}
 			if nodeInfo.When == -1 {
 				predicted := false
 				if prediction != nil {
-					if prediction.ratio >= 2.0 {
+					if prediction.ratio >= 0.2 {
 						predicted = true
 						(&nodesInfo).Mark(key, prediction.passed, execInfo.Execs, false)
+						fmt.Printf("%q,%q,%t,%.4f,%t,%.4f,%.4f\n", prediction.key, prediction.modelName, prediction.passed, prediction.prediction, prediction.passed, prediction.prediction, prediction.ratio)
 					}
 				}
 				if !predicted {
 					result = h.c.Executor.Execute(*nodeInfo.Config, nodeInfo.WKL)
 					//log.Printf("[Policy.Exec] WKL:%v Result:%v\n", wkls[wkl], result)
 					if prediction != nil {
-						fmt.Printf("%s - real:{%t,%.4f} predict:{%t,%.4f} ratio:%.4f\n", prediction.key, result.SLO <= slo, result.SLO, prediction.passed, prediction.prediction, prediction.ratio)
+						fmt.Printf("%q,%q,%t,%.4f,%t,%.4f,%.4f\n", prediction.key, prediction.modelName, result.SLO <= slo, result.SLO, prediction.passed, prediction.prediction, prediction.ratio)
 					}
 
 					execInfo.Path = fmt.Sprintf("%v%v->", execInfo.Path, key)
