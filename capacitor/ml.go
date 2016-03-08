@@ -65,18 +65,21 @@ func init() {
 func Predict(capPoints []CapacitorPoint, capPoint CapacitorPoint) (performance float64, model string) {
 	performance = -1
 	model = ""
-	/*
-		if points := pointsByConfiguration(capPoints, capPoint); len(points) > 1 {
-			usl := USL{Points: points}
-			usl.BuildUSL()
+
+	if points := pointsByConfiguration(capPoints, capPoint); len(points) > 1 {
+		usl := USL{Points: points}
+		usl.BuildUSL()
+		if isBetweenPoints(points, float64(capPoint.wkl)) {
 			performance = usl.Predict(float64(capPoint.wkl))
 			model = "uslByConfig"
 			return
 		}
+	}
+	/*
 		if points := pointsByWorkload(capPoints, capPoint); len(points) > 1 {
 			usl := USL{Points: points, Y1IsMax: true}
 			usl.BuildUSL()
-			if usl.R2 >= 0.7 {
+			if isBetweenPoints(points, workloadModelX(capPoint)) && usl.R2 >= 0.7 {
 				performance = usl.Predict(workloadModelX(capPoint))
 				model = "uslByWorkload"
 				return
@@ -93,6 +96,22 @@ func Predict(capPoints []CapacitorPoint, capPoint CapacitorPoint) (performance f
 		}
 	}
 	return
+}
+
+func isBetweenPoints(points Points, x float64) bool {
+	hasSmaller, hasHigher := false, false
+	for _, v := range points {
+		if v.X < x {
+			hasSmaller = true
+		}
+		if v.X > x {
+			hasHigher = true
+		}
+		if hasSmaller && hasHigher {
+			break
+		}
+	}
+	return hasSmaller && hasHigher
 }
 
 func pointsByThroughput(capPoints []CapacitorPoint, capPoint CapacitorPoint) (points Points) {

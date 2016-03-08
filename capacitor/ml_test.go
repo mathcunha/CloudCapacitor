@@ -96,11 +96,13 @@ func TestMachineLearningConfiguration(t *testing.T) {
 	capPoints[i] = CapacitorPoint{result.Config, 20000000, float64(result.SLO)}
 	i++
 
-	result = m.Execute(*configs[0], "30000000")
-	capPoints[i] = CapacitorPoint{result.Config, 30000000, float64(result.SLO)}
+	result = m.Execute(*configs[0], "40000000")
+	capPoints[i] = CapacitorPoint{result.Config, 40000000, float64(result.SLO)}
 	i++
 
-	Predict(capPoints, CapacitorPoint{config: *configs[0], wkl: 40000000})
+	prediction, modelName := Predict(capPoints, CapacitorPoint{config: *configs[0], wkl: 40000000})
+	result = m.Execute(*configs[0], "40000000")
+	fmt.Printf("%q,%.4f,%.4f\n", modelName, result.SLO, prediction)
 }
 
 func TestMachineLearningConfigurationMiddleXLarge(t *testing.T) {
@@ -128,7 +130,9 @@ func TestMachineLearningConfigurationMiddleXLarge(t *testing.T) {
 	capPoints[i] = CapacitorPoint{result.Config, 30000000, float64(result.SLO)}
 	i++
 
-	Predict(capPoints, CapacitorPoint{config: *configs[2], wkl: 20000000})
+	prediction, modelName := Predict(capPoints, CapacitorPoint{config: *configs[2], wkl: 20000000})
+	result = m.Execute(*configs[2], "20000000")
+	fmt.Printf("%q,%.4f,%.4f\n", modelName, result.SLO, prediction)
 }
 
 func TestMachineLearningConfigurationModels(t *testing.T) {

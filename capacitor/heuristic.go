@@ -398,7 +398,7 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 			if nodeInfo.When == -1 {
 				predicted := false
 				if prediction != nil {
-					if prediction.ratio >= 0.2 {
+					if prediction.modelName == "uslByConfig" || prediction.ratio >= 0.2 {
 						predicted = true
 						(&nodesInfo).Mark(key, prediction.passed, execInfo.Execs, false)
 						fmt.Printf("%q,%q,%t,%.4f,%t,%.4f,%.4f,true\n", prediction.key, prediction.modelName, prediction.passed, prediction.prediction, prediction.passed, prediction.prediction, prediction.ratio)
