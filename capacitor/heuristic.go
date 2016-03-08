@@ -395,14 +395,15 @@ func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, d
 					if prediction.ratio >= 0.2 {
 						predicted = true
 						(&nodesInfo).Mark(key, prediction.passed, execInfo.Execs, false)
-						fmt.Printf("%q,%q,%t,%.4f,%t,%.4f,%.4f\n", prediction.key, prediction.modelName, prediction.passed, prediction.prediction, prediction.passed, prediction.prediction, prediction.ratio)
+						fmt.Printf("%q,%q,%t,%.4f,%t,%.4f,%.4f,true\n", prediction.key, prediction.modelName, prediction.passed, prediction.prediction, prediction.passed, prediction.prediction, prediction.ratio)
+						currentExec++
 					}
 				}
 				if !predicted {
 					result = h.c.Executor.Execute(*nodeInfo.Config, nodeInfo.WKL)
 					//log.Printf("[Policy.Exec] WKL:%v Result:%v\n", wkls[wkl], result)
 					if prediction != nil {
-						fmt.Printf("%q,%q,%t,%.4f,%t,%.4f,%.4f\n", prediction.key, prediction.modelName, result.SLO <= slo, result.SLO, prediction.passed, prediction.prediction, prediction.ratio)
+						fmt.Printf("%q,%q,%t,%.4f,%t,%.4f,%.4f,false\n", prediction.key, prediction.modelName, result.SLO <= slo, result.SLO, prediction.passed, prediction.prediction, prediction.ratio)
 					}
 
 					execInfo.Path = fmt.Sprintf("%v%v->", execInfo.Path, key)
