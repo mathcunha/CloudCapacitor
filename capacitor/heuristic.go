@@ -341,7 +341,13 @@ func rampUpModelsWorkload(nodes Nodes, nodesInfo NodesInfo) (path []string) {
 }
 
 func rampUpModelsThrput(nodes Nodes, nodesInfo NodesInfo) (path []string) {
-	path = append(path, GetMatrixKey(nodes.NodeByLevel(1).ID, 0), GetMatrixKey(nodes.NodeByLevel(nodesInfo.Levels).ID, nodesInfo.Workloads-1), GetMatrixKey(nodes.NodeByLevel(nodesInfo.Levels/2).ID, nodesInfo.Workloads/2))
+	path = append(path, GetMatrixKey(nodes.NodeByLevel(1).ID, 0), GetMatrixKey(nodes.NodeByLevel(nodesInfo.Levels).ID, nodesInfo.Workloads-1))
+
+	node := nodes.NodeByLevel(nodesInfo.Levels / 2)
+	equivalent := append(nodes.Equivalents(node), node)
+	sort.Sort(bySize{equivalent})
+	path = append(path, GetMatrixKey(equivalent[len(equivalent)-1].ID, nodesInfo.Workloads/2))
+
 	return
 }
 
