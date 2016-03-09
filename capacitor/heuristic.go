@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 const (
@@ -173,6 +174,13 @@ func whatIfNodesLeft(nodesInfo *NodesInfo, passed bool, key string, h *Policy, n
 }
 
 func (h *Policy) PredictNextNode(capPoints []CapacitorPoint, nodesInfo NodesInfo, nextKey string, slo float64, nodes Nodes) *predictPoint {
+	var wg sync.WaitGroup
+	wg.Add(1)
+	var ml ML
+	go func() {
+		ml = NewML(capPoints)
+		wg.Done()
+	}()
 	//select by the Policy
 	worstCase := whatIfNodesLeft(nodesInfo.Clone(), false, nextKey, h, nodes, nodesInfo.Matrix[nextKey])
 	if nodesLeft := whatIfNodesLeft(nodesInfo.Clone(), true, nextKey, h, nodes, nodesInfo.Matrix[nextKey]); nodesLeft > worstCase {
@@ -194,8 +202,8 @@ func (h *Policy) PredictNextNode(capPoints []CapacitorPoint, nodesInfo NodesInfo
 	sort.Sort(byNodesLeft{predictPoints})
 	mapPrediction := make(map[string]float64)
 	mapModelName := make(map[string]string)
-	ml := NewML(capPoints)
 
+	wg.Wait()
 	for _, v := range predictPoints {
 		if v.nodesLeft >= worstCase {
 			break
