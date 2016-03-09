@@ -194,6 +194,7 @@ func (h *Policy) PredictNextNode(capPoints []CapacitorPoint, nodesInfo NodesInfo
 	sort.Sort(byNodesLeft{predictPoints})
 	mapPrediction := make(map[string]float64)
 	mapModelName := make(map[string]string)
+	ml := NewML(capPoints)
 
 	for _, v := range predictPoints {
 		if v.nodesLeft >= worstCase {
@@ -202,7 +203,7 @@ func (h *Policy) PredictNextNode(capPoints []CapacitorPoint, nodesInfo NodesInfo
 		prediction, has := mapPrediction[v.key]
 		model := mapModelName[v.key]
 		if !has {
-			prediction, model = Predict(capPoints, v.CapacitorPoint)
+			prediction, model = ml.Predict(v.CapacitorPoint)
 			mapPrediction[v.key] = prediction
 			mapModelName[v.key] = model
 		}

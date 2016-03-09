@@ -28,6 +28,11 @@ type Point struct {
 	Y float64 `json:"y"`
 }
 
+type ML struct {
+	capPoints []CapacitorPoint
+	uslThrput *USL
+}
+
 type Points []Point
 
 type USL struct {
@@ -62,11 +67,21 @@ func init() {
 	local = false
 }
 
-func Predict(capPoints []CapacitorPoint, capPoint CapacitorPoint) (performance float64, model string) {
+func NewML(capPoints []CapacitorPoint) (ml ML) {
+	ml.capPoints = capPoints
+	if points := pointsByThroughput(capPoints); len(points) > 1 {
+		usl := USL{Points: points}
+		usl.BuildUSL()
+		ml.uslThrput = &usl
+	}
+	return
+}
+
+func (ml *ML) Predict(capPoint CapacitorPoint) (performance float64, model string) {
 	performance = -1
 	model = ""
 
-	if points := pointsByConfiguration(capPoints, capPoint); len(points) > 1 {
+	if points := pointsByConfiguration(ml.capPoints, capPoint); len(points) > 1 {
 		usl := USL{Points: points}
 		usl.BuildUSL()
 		if isBetweenPoints(points, float64(capPoint.wkl)) {
@@ -86,14 +101,10 @@ func Predict(capPoints []CapacitorPoint, capPoint CapacitorPoint) (performance f
 			}
 		}
 	*/
-	if points := pointsByThroughput(capPoints, capPoint); len(points) > 1 {
-		usl := USL{Points: points}
-		usl.BuildUSL()
-		if usl.R2 >= 0.7 {
-			performance = float64(capPoint.wkl) / usl.Predict(workloadModelX(capPoint))
-			model = "uslByThrput"
-			return
-		}
+	if ml.uslThrput != nil && ml.uslThrput.R2 >= 0.7 {
+		performance = float64(capPoint.wkl) / ml.uslThrput.Predict(workloadModelX(capPoint))
+		model = "uslByThrput"
+		return
 	}
 	return
 }
@@ -114,7 +125,7 @@ func isBetweenPoints(points Points, x float64) bool {
 	return hasSmaller && hasHigher
 }
 
-func pointsByThroughput(capPoints []CapacitorPoint, capPoint CapacitorPoint) (points Points) {
+func pointsByThroughput(capPoints []CapacitorPoint) (points Points) {
 	for _, v := range capPoints {
 		points = append(points, Point{workloadModelX(v), float64(v.wkl) / v.performance})
 	}
