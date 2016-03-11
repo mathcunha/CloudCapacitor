@@ -35,6 +35,11 @@ type NodeExec struct {
 	ExecInfo
 }
 
+type point struct {
+	x int
+	y int
+}
+
 type predictPoint struct {
 	CapacitorPoint
 	key        string
@@ -92,6 +97,16 @@ type Policy struct {
 	equiBehavior    int
 	isCapacityFirst bool
 	useML           bool
+}
+
+type MachineLearning struct {
+	c      *Capacitor
+	k, max int
+}
+
+func NewMachineLearning(c *Capacitor) (h *MachineLearning) {
+	h = &MachineLearning{c, 4, 8}
+	return
 }
 
 func NewPolicy(c *Capacitor, levelPolicy string, wklPolicy string, equiBehavior int, isCapacityFirst bool, useML bool) (h *Policy) {
@@ -358,6 +373,115 @@ func rampUpModelsThrput(nodes Nodes, nodesInfo NodesInfo) (path []string) {
 	path = append(path, GetMatrixKey(equivalent[len(equivalent)-1].ID, nodesInfo.Workloads/2))
 
 	return
+}
+
+func (h *MachineLearning) GreedyAdaptiveSamplingAlgorithm(nodes Nodes, nodesInfo NodesInfo) (path []string) {
+	borderPoints := []point{point{0, 0}, point{nodesInfo.Levels - 1, nodesInfo.Workloads - 1}, point{0, nodesInfo.Workloads - 1}, point{nodesInfo.Levels - 1, 0}, point{0, nodesInfo.Workloads / 2}, point{nodesInfo.Levels - 1, nodesInfo.Workloads / 2}, point{(nodesInfo.Levels - 1) / 2, 0}, point{(nodesInfo.Levels - 1) / 2, nodesInfo.Workloads - 1}}
+
+	points := borderPoints[0:h.k]
+
+	findMax := func(points []point) *point {
+		max := 0
+		var p *point
+		for i := 0; i < len(points); i++ {
+			for j := i + 1; j < len(points); j++ {
+				point := point{int(math.Abs(float64(points[i].x-points[j].x) / 2)), int(math.Abs(float64(points[i].y-points[j].y) / 2))}
+				if dist := point.x + point.y; dist > max {
+					found := false
+					if points[i].x > points[j].x {
+						point.x += points[j].x
+					} else if points[j].x > points[i].x {
+						point.x += points[i].x
+					}
+					if points[i].y > points[j].y {
+						point.y += points[j].y
+					} else if points[j].y > points[i].y {
+						point.y += points[i].y
+					}
+					for _, v := range points {
+						if v.x == point.x && v.y == point.y {
+							found = true
+							break
+						}
+					}
+
+					if !found {
+						max = dist
+						p = &point
+					}
+				}
+			}
+		}
+		return p
+	}
+
+	for i := h.k; i < h.max; i++ {
+		p := findMax(points)
+		if p != nil {
+			points = append(points, *p)
+		}
+	}
+
+	for _, v := range points {
+		node := nodes.NodeByLevel(v.x + 1)
+		equivalent := append(nodes.Equivalents(node), node)
+		sort.Sort(bySize{equivalent})
+		path = append(path, GetMatrixKey(equivalent[len(equivalent)-1].ID, v.y))
+	}
+
+	return
+}
+
+func (h *MachineLearning) Exec(mode string, slo float32, wkls []string) (path ExecInfo, dspaceInfo map[string]NodesInfo) {
+	dspace := h.c.Dspace.CapacityBy(mode)
+	execInfo := ExecInfo{0, ""}
+
+	//map to store the results by category
+	dspaceInfo = make(map[string]NodesInfo)
+
+	for _, cat := range h.c.Dspace.Categories() {
+		nodes := (*dspace)[cat]
+		dspaceInfo[cat] = buildMatrix(wkls, nodes)
+		nodesInfo := dspaceInfo[cat]
+		var capPoints []CapacitorPoint
+		rampUpModelsPath := h.GreedyAdaptiveSamplingAlgorithm(nodes, nodesInfo)
+		for _, key := range rampUpModelsPath {
+			nodeInfo := nodesInfo.Matrix[key]
+			execInfo.Path = fmt.Sprintf("%v%v->", execInfo.Path, key)
+			execInfo.Execs++
+			result := h.c.Executor.Execute(*nodeInfo.Config, nodeInfo.WKL)
+
+			nodesInfo.Matrix[key].When = execInfo.Execs
+			nodesInfo.Matrix[key].Exec = true
+
+			if result.SLO <= slo {
+				nodesInfo.Matrix[key].Candidate = true
+			} else {
+				nodesInfo.Matrix[key].Reject = true
+			}
+			if s, err := strconv.Atoi(nodeInfo.WKL); err == nil {
+				capPoints = append(capPoints, CapacitorPoint{result.Config, s, float64(result.SLO)})
+			}
+		}
+
+		ml := NewML(capPoints)
+		for key, node := range nodesInfo.Matrix {
+			if !(node.When != -1) {
+				wkl, _ := strconv.Atoi(node.WKL)
+				prediction, _ := ml.Predict(CapacitorPoint{config: *node.Config, wkl: wkl})
+				nodesInfo.Matrix[key].When = execInfo.Execs
+				nodesInfo.Matrix[key].Exec = false
+				if prediction <= float64(slo) {
+					nodesInfo.Matrix[key].Candidate = true
+				} else {
+					nodesInfo.Matrix[key].Reject = true
+				}
+
+			}
+		}
+	}
+
+	return execInfo, dspaceInfo
 }
 
 func (h *Policy) Exec(mode string, slo float32, wkls []string) (path ExecInfo, dspaceInfo map[string]NodesInfo) {

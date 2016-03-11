@@ -230,6 +230,8 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 			h = capacitor.NewBrutalForce(&c)
 		case "sp":
 			h = capacitor.NewShortestPath(&c, config.EquiBehavior)
+		case "ml":
+			h = capacitor.NewMachineLearning(&c)
 		default:
 			h = capacitor.NewPolicy(&c, config.Configuration, config.WKL, config.EquiBehavior, config.IsCapacityFirst, config.UseML)
 		}
