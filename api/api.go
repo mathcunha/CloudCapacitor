@@ -169,6 +169,8 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 			Slo             float32 `json:"slo"`
 			Price           float32 `json:"price"`
 			Size            int     `json:"instances"`
+			K               int     `json:"k"`
+			Max             int     `json:"max"`
 			Mode            string  `json:"mode"`
 			Category        bool    `json:"category"`
 			Demand          []int   `json:"demand"`
@@ -231,7 +233,11 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 		case "sp":
 			h = capacitor.NewShortestPath(&c, config.EquiBehavior)
 		case "ml":
-			h = capacitor.NewMachineLearning(&c)
+			if config.K == 0 {
+				config.K = 4
+				config.Max = 8
+			}
+			h = capacitor.NewMachineLearning(&c, config.K, config.Max)
 		default:
 			h = capacitor.NewPolicy(&c, config.Configuration, config.WKL, config.EquiBehavior, config.IsCapacityFirst, config.UseML)
 		}

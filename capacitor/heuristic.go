@@ -104,8 +104,8 @@ type MachineLearning struct {
 	k, max int
 }
 
-func NewMachineLearning(c *Capacitor) (h *MachineLearning) {
-	h = &MachineLearning{c, 4, 8}
+func NewMachineLearning(c *Capacitor, k, max int) (h *MachineLearning) {
+	h = &MachineLearning{c, k, max}
 	return
 }
 
