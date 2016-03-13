@@ -13,6 +13,16 @@
 		}
 	});
 
+$.urlParam = function(name){
+	var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.href);
+	if (results==null){
+		return null;
+	}
+	else{
+		return results[1] || 0;
+	}
+}
+
         function googleChart(data){
 		var chartData = new google.visualization.DataTable();
 		chartData.addColumn('string', 'Configuration');
@@ -181,9 +191,19 @@
 			if (!validateInputs()){
 				return false
 			}
+			max = $.urlParam('max');
+			if (max==null){
+				max = 8
+			}
+			k = $.urlParam('k');
+			if (k == null){
+				k = 4
+			}
 			
 			data = '{"slo":' + $( "#slo" ).val()
 			data = data + ', "price":'+$( "#price" ).val()
+			data = data + ', "k":'+k
+			data = data + ', "max":'+max
 			data = data + ', "instances":'+$( "#instances" ).val()
 			data = data + ', "mode":"'+$( "#mode" ).val()+'"'
 			data = data + ', "heuristic":"'+$( '#heuristic' ).val()+'"'
