@@ -48,6 +48,7 @@ type predictPoint struct {
 	prediction float64
 	ratio      float64
 	modelName  string
+	oposite    *predictPoint
 }
 type byNodesLeft struct{ predictPoints []predictPoint }
 
@@ -208,8 +209,10 @@ func (h *Policy) PredictNextNode(capPoints []CapacitorPoint, nodesInfo NodesInfo
 	for key, node := range nodesInfo.Matrix {
 		if !(node.When != -1) {
 			wkl, _ := strconv.Atoi(node.WKL)
-			predictPoints = append(predictPoints, predictPoint{CapacitorPoint: CapacitorPoint{config: *node.Config, wkl: wkl}, key: key, nodesLeft: whatIfNodesLeft(nodesInfo.Clone(), false, key, h, nodes, node), passed: false})
-			predictPoints = append(predictPoints, predictPoint{CapacitorPoint: CapacitorPoint{config: *node.Config, wkl: wkl}, key: key, nodesLeft: whatIfNodesLeft(nodesInfo.Clone(), true, key, h, nodes, node), passed: true})
+			p := predictPoint{CapacitorPoint: CapacitorPoint{config: *node.Config, wkl: wkl}, key: key, nodesLeft: whatIfNodesLeft(nodesInfo.Clone(), false, key, h, nodes, node), passed: false}
+			p.oposite = &predictPoint{CapacitorPoint: CapacitorPoint{config: *node.Config, wkl: wkl}, key: key, nodesLeft: whatIfNodesLeft(nodesInfo.Clone(), true, key, h, nodes, node), passed: true, oposite: &p}
+			predictPoints = append(predictPoints, p)
+			predictPoints = append(predictPoints, *p.oposite)
 		}
 	}
 
@@ -246,6 +249,9 @@ func (h *Policy) PredictNextNode(capPoints []CapacitorPoint, nodesInfo NodesInfo
 					return &v
 				}
 			}
+		}
+		if v.nodesLeft == v.oposite.nodesLeft {
+			return &v
 		}
 	}
 
