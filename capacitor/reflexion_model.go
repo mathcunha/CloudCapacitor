@@ -111,6 +111,63 @@ func hasPathUntilNode(target *Node, levelNodes Nodes, nodes *Nodes, equi bool) (
 	return
 }
 
+func VerifyReflexionModel3(c Configs, mapNodes *map[string]Nodes, equi bool) (convergence, absence, divergence int) {
+	hasArcN1_N2 := func(r int) bool {
+		switch r {
+		case Equal:
+			return true
+		case Bigger:
+			return true
+		}
+		return false
+
+	}
+	hasArcN2_N1 := func(r int) bool {
+		switch r {
+		case Equal:
+			return true
+		case Smaller:
+			return true
+		}
+		return false
+
+	}
+	calcModel := func(hasArcModel, hasArcSource bool) (int, int, int) {
+		if hasArcSource && hasArcModel && true {
+			return 1, 0, 0 //convergence
+		}
+		if hasArcSource && !hasArcModel {
+			return 0, 0, 1 //divergence
+		}
+		if hasArcModel && !hasArcSource {
+			return 0, 1, 0 //absence
+		}
+		return 0, 0, 0
+	}
+	for k := 0; k < len(c); k++ {
+		for j := k + 1; j < len(c); j++ {
+			n1, key1 := getNodeByConf(c[k], mapNodes)
+			n2, key2 := getNodeByConf(c[j], mapNodes)
+			dsRelation := WhatRelation(n1, n2, key1, key2, mapNodes, equi)
+			realRelation := Bigger
+			if strings.Compare(n1.Config.MaxSLO(), n2.Config.MaxSLO()) == 0 {
+				realRelation = Equal
+			} else if isConvergence(n1, n2) {
+				realRelation = Smaller
+			}
+			c, a, d := calcModel(hasArcN1_N2(realRelation), hasArcN1_N2(dsRelation))
+			convergence += c
+			absence += a
+			divergence += d
+			c, a, d = calcModel(hasArcN2_N1(realRelation), hasArcN2_N1(dsRelation))
+			convergence += c
+			absence += a
+			divergence += d
+		}
+	}
+	return
+}
+
 func VerifyReflexionModel2(c Configs, mapNodes *map[string]Nodes, equi bool) (convergence, absence, divergence int) {
 	for k := 0; k < len(c); k++ {
 		for j := k + 1; j < len(c); j++ {
