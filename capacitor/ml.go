@@ -29,8 +29,9 @@ type Point struct {
 }
 
 type ML struct {
-	capPoints []CapacitorPoint
-	uslThrput *USL
+	capPoints             []CapacitorPoint
+	uslThrput             *USL
+	linearRegressionModel *LinearRegression
 }
 
 type Points []Point
@@ -39,6 +40,11 @@ type USL struct {
 	Points                 Points
 	Alpha, Beta, R2, N, Y1 float64
 	Y1IsMax                bool
+}
+
+type LinearRegression struct {
+	Points          Points
+	Alpha, Beta, R2 float64
 }
 
 func init() {
@@ -67,8 +73,16 @@ func init() {
 	local = false
 }
 
-func NewML(capPoints []CapacitorPoint) (ml ML) {
+func NewML(capPoints []CapacitorPoint, lr bool) (ml ML) {
 	ml.capPoints = capPoints
+	if lr {
+		if points := pointsByThroughput(capPoints); len(points) > 1 {
+			model := LinearRegression{Points: points}
+			model.BuildModel()
+			ml.linearRegressionModel = &model
+		}
+		return
+	}
 	if points := pointsByThroughput(capPoints); len(points) > 1 {
 		usl := USL{Points: points}
 		usl.BuildUSL()
@@ -80,6 +94,12 @@ func NewML(capPoints []CapacitorPoint) (ml ML) {
 func (ml *ML) Predict(capPoint CapacitorPoint) (performance float64, model string) {
 	performance = -1
 	model = ""
+
+	if ml.linearRegressionModel != nil {
+		performance = float64(capPoint.wkl) / ml.linearRegressionModel.Predict(workloadModelX(capPoint))
+		model = "linearRegression"
+		return
+	}
 
 	if points := pointsByConfiguration(ml.capPoints, capPoint); len(points) > 1 {
 		usl := USL{Points: points}
@@ -155,11 +175,33 @@ func pointsByWorkload(capPoints []CapacitorPoint, capPoint CapacitorPoint) (poin
 	return
 }
 
+func (lr *LinearRegression) Predict(x float64) (y float64) {
+	y = (x * lr.Alpha) + lr.Beta
+	return
+}
+
 func (u *USL) Predict(x float64) (y float64) {
 	kappa := u.Beta
 	sigma := u.Alpha + kappa
 	y = x / (1 + (sigma * (x - 1)) + (kappa * x * (x - 1)))
 	y *= u.Y1
+	return
+}
+
+func (lr *LinearRegression) BuildModel() {
+	buf := bytes.NewBufferString("")
+	json.NewEncoder(buf).Encode(lr.Points)
+
+	cmd := exec.Command("Rscript", "--vanilla", os.Getenv("GOPATH")+"/src/github.com/mathcunha/CloudCapacitor/config/lr.R", buf.String())
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("callRScript error calling Rscript :%v\n", err)
+		return
+	}
+	if err := json.Unmarshal(out.Bytes(), &[]*LinearRegression{lr}); err != nil {
+		log.Printf("callRScript error parsing response %v: %v\n", out.String(), err)
+	}
 	return
 }
 

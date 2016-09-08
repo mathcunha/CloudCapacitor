@@ -237,7 +237,13 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 				config.K = 4
 				config.Max = 8
 			}
-			h = capacitor.NewMachineLearning(&c, config.K, config.Max)
+			h = capacitor.NewMachineLearning(&c, config.K, config.Max, false)
+		case "lr":
+			if config.K == 0 {
+				config.K = 4
+				config.Max = 8
+			}
+			h = capacitor.NewMachineLearning(&c, config.K, config.Max, true)
 		default:
 			h = capacitor.NewPolicy(&c, config.Configuration, config.WKL, config.EquiBehavior, config.IsCapacityFirst, config.UseML)
 		}

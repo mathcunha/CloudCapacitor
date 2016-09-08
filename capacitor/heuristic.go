@@ -103,10 +103,11 @@ type Policy struct {
 type MachineLearning struct {
 	c      *Capacitor
 	k, max int
+	isLR   bool
 }
 
-func NewMachineLearning(c *Capacitor, k, max int) (h *MachineLearning) {
-	h = &MachineLearning{c, k, max}
+func NewMachineLearning(c *Capacitor, k, max int, isLR bool) (h *MachineLearning) {
+	h = &MachineLearning{c, k, max, isLR}
 	return
 }
 
@@ -194,7 +195,7 @@ func (h *Policy) PredictNextNode(capPoints []CapacitorPoint, nodesInfo NodesInfo
 	wg.Add(1)
 	var ml ML
 	go func() {
-		ml = NewML(capPoints)
+		ml = NewML(capPoints, false)
 		wg.Done()
 	}()
 	//select by the Policy
@@ -470,7 +471,7 @@ func (h *MachineLearning) Exec(mode string, slo float32, wkls []string) (path Ex
 			}
 		}
 
-		ml := NewML(capPoints)
+		ml := NewML(capPoints, h.isLR)
 		for key, node := range nodesInfo.Matrix {
 			if !(node.When != -1) {
 				wkl, _ := strconv.Atoi(node.WKL)
