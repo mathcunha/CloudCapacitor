@@ -170,18 +170,19 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 			Price           float32 `json:"price"`
 			Size            int     `json:"instances"`
 			K               int     `json:"k"`
-			Max             int     `json:"max"`
-			Mode            string  `json:"mode"`
-			Category        bool    `json:"category"`
-			Demand          []int   `json:"demand"`
-			VMtype          []int   `json:"vmtype"`
-			WKL             string  `json:"wkl"`
-			Configuration   string  `json:"configuration"`
-			Heuristic       string  `json:"heuristic"`
-			MaxExecs        int     `json:"maxExecs"`
-			EquiBehavior    int     `json:"equiBehavior"`
-			App             string  `json:"app"`
-			IsCapacityFirst bool    `json:"isCapacityFirst"`
+			Roar            bool
+			Max             int    `json:"max"`
+			Mode            string `json:"mode"`
+			Category        bool   `json:"category"`
+			Demand          []int  `json:"demand"`
+			VMtype          []int  `json:"vmtype"`
+			WKL             string `json:"wkl"`
+			Configuration   string `json:"configuration"`
+			Heuristic       string `json:"heuristic"`
+			MaxExecs        int    `json:"maxExecs"`
+			EquiBehavior    int    `json:"equiBehavior"`
+			App             string `json:"app"`
+			IsCapacityFirst bool   `json:"isCapacityFirst"`
 			UseML           bool
 		}
 
@@ -215,6 +216,16 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 			wkls[i] = strconv.Itoa(d)
 		}
 
+		var ROAR *capacitor.ROARExecutor
+
+		if config.Roar {
+			ROAR, err = capacitor.NewROARExecutor(&vms, wkls, m)
+			if err != nil {
+				log.Println("ERROR: callCapacitorResource unable to start ROARExecutor")
+				return
+			}
+		}
+
 		if config.Mode == "MaxSLO" {
 			slos := []float32{10000, 20000, 30000, 40000, 50000}
 			if config.App == "terasort" {
@@ -229,6 +240,9 @@ func callCapacitorResource(w http.ResponseWriter, r *http.Request) {
 		case "e":
 			h = capacitor.NewExplorePath(&c, config.MaxExecs)
 		case "bf":
+			if config.Roar {
+				c = capacitor.Capacitor{dspace, ROAR}
+			}
 			h = capacitor.NewBrutalForce(&c)
 		case "sp":
 			h = capacitor.NewShortestPath(&c, config.EquiBehavior)

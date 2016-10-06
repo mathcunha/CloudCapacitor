@@ -12,6 +12,6 @@ func TestRoar(t *testing.T) {
 
 	e := MockExecutor{"/home/vagrant/go/src/github.com/mathcunha/CloudCapacitor/config/terasort_cpu_mem.csv", nil}
 	e.Load()
-	throughtput, _ := findPeakByType(&vms, []string{"10000000", "20000000", "30000000", "40000000", "50000000"}, float32(250), e)
+	throughtput, _ := NewROARExecutor(&vms, []string{"10000000", "20000000", "30000000", "40000000", "50000000"}, e)
 	t.Logf("ROAR generated %v", throughtput)
 }

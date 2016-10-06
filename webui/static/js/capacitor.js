@@ -199,11 +199,18 @@ $.urlParam = function(name){
 			if (k == null){
 				k = 4
 			}
+			roar = $.urlParam('roar');
+			if (roar==null){
+				roar=false
+			}else{
+				roar=true
+			}
 			
 			data = '{"slo":' + $( "#slo" ).val()
 			data = data + ', "price":'+$( "#price" ).val()
 			data = data + ', "k":'+k
 			data = data + ', "max":'+max
+			data = data + ', "roar":'+roar
 			data = data + ', "instances":'+$( "#instances" ).val()
 			data = data + ', "mode":"'+$( "#mode" ).val()+'"'
 			data = data + ', "heuristic":"'+$( '#heuristic' ).val()+'"'
