@@ -18,6 +18,7 @@ const (
 type Result struct {
 	Config Configuration
 	Performance
+	NotExected bool
 }
 
 type Performance struct {

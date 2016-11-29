@@ -6,12 +6,18 @@ import (
 )
 
 type ROARExecutor struct {
+	Executor
 	throughtputs map[string]float32
 }
 
 func (e *ROARExecutor) Execute(config Configuration, wkl string) (r Result) {
+	if config.Size == 1 {
+		//because it was already executed at NewROARExecutor method. //TODO store raw execution results
+		return e.Executor.Execute(config, wkl)
+	}
 	if iWKL, err := strconv.ParseInt(wkl, 10, 32); err == nil {
 		r = Result{Config: config, Performance: Performance{SLO: float32(iWKL) / e.throughtputs[config.VM.Name] * float32(config.Size)}}
+		r.NotExected = true
 	} else {
 		log.Printf("ROARExecutor.Execute, error parsing %v to int", wkl)
 		r = Result{}
@@ -39,5 +45,5 @@ func NewROARExecutor(vms *[]VM, wkls []string, e Executor) (*ROARExecutor, error
 		}
 		throughtputs[vm.Name] = peak
 	}
-	return &ROARExecutor{throughtputs}, nil
+	return &ROARExecutor{e, throughtputs}, nil
 }

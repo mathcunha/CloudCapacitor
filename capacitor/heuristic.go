@@ -156,10 +156,12 @@ func (h *BrutalForce) Exec(mode string, slo float32, wkls []string) (path ExecIn
 		nodesInfo := buildMatrix(wkls, nodes)
 		for key, node := range nodesInfo.Matrix {
 			result := h.c.Executor.Execute(*node.Config, node.WKL)
-			execInfo.Path = fmt.Sprintf("%v%v->", execInfo.Path, key)
-			execInfo.Execs++
+			if !result.NotExected {
+				execInfo.Path = fmt.Sprintf("%v%v->", execInfo.Path, key)
+				execInfo.Execs++
+				node.Exec = true
+			}
 			node.When = execInfo.Execs
-			node.Exec = true
 			if result.SLO <= slo {
 				node.Candidate = true
 			} else {
