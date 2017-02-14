@@ -115,7 +115,20 @@ func CalcCapacityAccuracy(convergence, absence, divergence int) (result float32)
 	result = float32(convergence) / float32(convergence+divergence+(absence*absence))
 	return result
 }
+func CalcCapacityAccuracyV1(convergence, absence, divergence int) (result float32) {
+	result = float32(convergence) / float32(convergence+absence)
+	return result
+}
 
+func CalcCapacityAccuracyV2(convergence, absence, divergence int) (result float32) {
+	result = float32(convergence+divergence) / float32(convergence+divergence+absence)
+	return result
+}
+
+func CalcCapacityAccuracyV3(convergence, absence, divergence int) (result float32) {
+	result = float32(convergence) / float32(convergence+absence*absence)
+	return result
+}
 func VerifyReflexionModel3(c Configs, mapNodes *map[string]Nodes, equi bool) (convergence, absence, divergence int) {
 	hasArcN1_N2 := func(r int) bool {
 		switch r {
