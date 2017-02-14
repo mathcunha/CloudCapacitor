@@ -111,8 +111,8 @@ func hasPathUntilNode(target *Node, levelNodes Nodes, nodes *Nodes, equi bool) (
 	return
 }
 
-func CalcCapacityAccuracy (convergence, absence, divergence int) (result float32){
-	result = float32 (convergence) / float32 (convergence + divergence + (2 * absence))
+func CalcCapacityAccuracy(convergence, absence, divergence int) (result float32) {
+	result = float32(convergence) / float32(convergence+divergence+(absence*absence))
 	return result
 }
 
